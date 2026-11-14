@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 import { Pool, type PoolClient } from "pg";
 import { computeClaimAmountCents, type FeeMode } from "./money";
@@ -86,10 +87,30 @@ interface LocalStoreData {
   platform_settings: Record<string, string>;
 }
 
-const LOCAL_STORE_PATH = path.join(process.cwd(), ".data", "store.json");
+function isServerlessRuntime(): boolean {
+  return (
+    process.env.VERCEL === "1" ||
+    process.env.NETLIFY === "true" ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    process.cwd().startsWith("/var/task")
+  );
+}
+
+function getLocalStorePath(): string {
+  if (isServerlessRuntime()) {
+    return path.join(os.tmpdir(), "lyt-redpacket-data", "store.json");
+  }
+  return path.join(process.cwd(), ".data", "store.json");
+}
 
 function getDatabaseUrl(): string | undefined {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL;
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.NETLIFY_DATABASE_URL ||
+    process.env.NETLIFY_DATABASE_URL_UNPOOLED
+  );
 }
 
 export function isPostgresConfigured(): boolean {
@@ -97,17 +118,15 @@ export function isPostgresConfigured(): boolean {
 }
 
 export function isEphemeralWarning(): boolean {
-  return (
-    !isPostgresConfigured() &&
-    (process.env.VERCEL === "1" || process.env.NETLIFY === "true")
-  );
+  return !isPostgresConfigured() && isServerlessRuntime();
 }
 
-// Singleton Postgres Pool across hot reloads / warm serverless instances
+// Singleton Postgres Pool & fallback memory store across warm serverless instances
 const globalForDb = globalThis as unknown as {
   __pgPool?: Pool;
   __pgInitialized?: Promise<void>;
   __localMutex?: Promise<unknown>;
+  __memoryStore?: LocalStoreData;
 };
 
 function getPool(): Pool {
@@ -218,25 +237,42 @@ async function withLocalMutex<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+function createEmptyStore(): LocalStoreData {
+  return {
+    nextPacketId: 1,
+    nextClaimId: 1,
+    red_packets: [],
+    red_packet_claims: [],
+    oauth_states: [],
+    platform_settings: {},
+  };
+}
+
 async function readLocalStore(): Promise<LocalStoreData> {
+  if (globalForDb.__memoryStore) {
+    return globalForDb.__memoryStore;
+  }
   try {
-    const raw = await fs.readFile(LOCAL_STORE_PATH, "utf8");
-    return JSON.parse(raw) as LocalStoreData;
+    const raw = await fs.readFile(getLocalStorePath(), "utf8");
+    const parsed = JSON.parse(raw) as LocalStoreData;
+    globalForDb.__memoryStore = parsed;
+    return parsed;
   } catch {
-    return {
-      nextPacketId: 1,
-      nextClaimId: 1,
-      red_packets: [],
-      red_packet_claims: [],
-      oauth_states: [],
-      platform_settings: {},
-    };
+    const empty = createEmptyStore();
+    globalForDb.__memoryStore = empty;
+    return empty;
   }
 }
 
 async function writeLocalStore(data: LocalStoreData): Promise<void> {
-  await fs.mkdir(path.dirname(LOCAL_STORE_PATH), { recursive: true });
-  await fs.writeFile(LOCAL_STORE_PATH, JSON.stringify(data, null, 2), "utf8");
+  globalForDb.__memoryStore = data;
+  try {
+    const storePath = getLocalStorePath();
+    await fs.mkdir(path.dirname(storePath), { recursive: true });
+    await fs.writeFile(storePath, JSON.stringify(data, null, 2), "utf8");
+  } catch {
+    // Ignore read-only FS errors in restricted runtimes; in-memory store still persists for the instance.
+  }
 }
 
 function normalizePgPacket(row: Record<string, unknown>): RedPacketRecord {

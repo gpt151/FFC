@@ -65,11 +65,11 @@ export default function MyRecordsPage() {
               <h1 className="text-lg font-semibold text-zinc-900">我的记录</h1>
               <p className="text-xs text-zinc-500">授权登录后查看发出与领到的红包</p>
             </div>
-            <Link href="/api/auth/login?returnTo=/my" className="block">
+            <a href="/api/auth/login?returnTo=/my" className="block">
               <Button variant="primary" fullWidth>
                 Lyt IT Pay 授权登录
               </Button>
-            </Link>
+            </a>
           </Card.Content>
         </Card>
       </div>

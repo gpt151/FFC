@@ -219,14 +219,14 @@ export default function ClaimRedPacketPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <Link
+                  <a
                     href={`/api/auth/login?returnTo=${encodeURIComponent(`/claim/${code}`)}`}
                     className="block"
                   >
                     <Button variant="secondary" fullWidth>
                       Lyt IT Pay 授权领取
                     </Button>
-                  </Link>
+                  </a>
 
                   {data.allowManualClaimEmail && (
                     <>

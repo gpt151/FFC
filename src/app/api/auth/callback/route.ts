@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decodeSignedToken, encodeSignedToken, USER_COOKIE_NAME } from "@/lib/auth";
+import {
+  decodeSignedToken,
+  encodeSignedToken,
+  getRequestOrigin,
+  USER_COOKIE_NAME,
+} from "@/lib/auth";
 import { getAndDeleteOAuthState } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 
 export async function GET(req: NextRequest) {
-  const origin = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || req.nextUrl.origin;
+  const origin = getRequestOrigin(req);
 
   try {
-    const queryCode = req.nextUrl.searchParams.get("code") || req.nextUrl.searchParams.get("auth_code");
+    const queryCode =
+      req.nextUrl.searchParams.get("code") || req.nextUrl.searchParams.get("auth_code");
     const pendingCookie = req.cookies.get("lyt_oauth_pending")?.value;
     const pending = decodeSignedToken<{
       authCode: string;
@@ -17,10 +23,16 @@ export async function GET(req: NextRequest) {
 
     const authCode = queryCode || pending?.authCode;
     if (!authCode) {
-      return NextResponse.redirect(new URL("/?auth_error=缺少授权码", origin));
+      return NextResponse.redirect(new URL("/?auth_error=缺少授权码，请重新授权", origin));
     }
 
-    const dbState = await getAndDeleteOAuthState(authCode);
+    let dbState = null;
+    try {
+      dbState = await getAndDeleteOAuthState(authCode);
+    } catch {
+      // Fall back to signed cookie state
+    }
+
     const secretKey = dbState?.secret_key || pending?.secretKey;
     const returnTo = dbState?.return_to || pending?.returnTo || "/";
 
@@ -30,8 +42,10 @@ export async function GET(req: NextRequest) {
 
     const info = await lytClient.getAuthInfo(authCode, secretKey);
     if (info.status !== "success" || !info.data?.email) {
-      const errMsg = encodeURIComponent(info.message || "用户尚未完成授权");
-      return NextResponse.redirect(new URL(`${returnTo}?auth_error=${errMsg}`, origin));
+      const errMsg = encodeURIComponent(info.message || "授权未完成");
+      const failUrl = new URL(returnTo, origin);
+      failUrl.searchParams.set("auth_error", decodeURIComponent(errMsg));
+      return NextResponse.redirect(failUrl);
     }
 
     const userToken = encodeSignedToken(

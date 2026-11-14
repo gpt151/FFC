@@ -1,8 +1,22 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 
 export const USER_COOKIE_NAME = "lyt_rp_user";
 export const ADMIN_COOKIE_NAME = "lyt_rp_admin";
+
+export function getRequestOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, "");
+  }
+  const protoHeader = req.headers.get("x-forwarded-proto");
+  const proto = protoHeader ? protoHeader.split(",")[0].trim() : req.nextUrl.protocol.replace(":", "") || "https";
+  const hostHeader = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (hostHeader) {
+    return `${proto}://${hostHeader.split(",")[0].trim()}`;
+  }
+  return req.nextUrl.origin;
+}
 
 function getSessionSecret(): string {
   return (
