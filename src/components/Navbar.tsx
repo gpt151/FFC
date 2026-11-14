@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button, Chip } from "@heroui/react";
-import { Gift, History, LogIn, LogOut, Send, ShieldCheck } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 interface UserInfo {
   userId: number;
@@ -41,44 +41,37 @@ export function Navbar() {
   };
 
   const navLinks = [
-    { href: "/", label: "包红包", icon: Send },
-    { href: "/claim", label: "领红包", icon: Gift },
-    { href: "/my", label: "我的记录", icon: History },
-    { href: "/admin", label: "数据后台", icon: ShieldCheck },
+    { href: "/", label: "发红包" },
+    { href: "/claim", label: "领红包" },
+    { href: "/my", label: "记录" },
+    { href: "/admin", label: "后台" },
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/5 bg-white/80 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl red-envelope-gradient flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-              <Gift className="w-5 h-5" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-bold text-base tracking-tight text-foreground">
-                LytPay <span className="text-rose-600">红包</span>
-              </div>
-              <div className="text-[11px] text-muted hidden sm:block">Lyt IT Pay 社交红包</div>
-            </div>
+    <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/85 backdrop-blur-md">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-7">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#c81e32]" />
+            <span className="font-semibold text-[15px] tracking-tight text-zinc-900">
+              LytPay
+            </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="flex items-center gap-1">
             {navLinks.map((item) => {
-              const Icon = item.icon;
               const isActive =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-[13px] font-medium transition-colors ${
                     isActive
-                      ? "bg-rose-50 text-rose-600"
-                      : "text-foreground/70 hover:text-foreground hover:bg-black/5"
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-500 hover:text-zinc-900"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
                   {item.label}
                 </Link>
               );
@@ -88,46 +81,23 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           {!loading && user ? (
-            <div className="flex items-center gap-2">
-              <Chip color="success" variant="soft" size="sm" className="hidden sm:inline-flex">
-                <Chip.Label>{user.email}</Chip.Label>
+            <div className="flex items-center gap-1.5">
+              <Chip variant="soft" size="sm" className="hidden sm:inline-flex">
+                <Chip.Label className="text-xs text-zinc-600">{user.email}</Chip.Label>
               </Chip>
-              <Button size="sm" variant="ghost" onPress={handleLogout}>
-                <LogOut className="w-3.5 h-3.5" />
-                退出
+              <Button size="sm" variant="ghost" onPress={handleLogout} aria-label="退出登录">
+                <LogOut className="w-3.5 h-3.5 text-zinc-500" />
               </Button>
             </div>
           ) : (
             <Link href={`/api/auth/login?returnTo=${encodeURIComponent(pathname || "/")}`}>
               <Button size="sm" variant="secondary">
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Lyt IT Pay </span>授权登录
+                授权登录
               </Button>
             </Link>
           )}
         </div>
       </div>
-
-      {/* Mobile bottom-style subnav inside header */}
-      <nav className="md:hidden flex items-center justify-around border-t border-black/5 px-2 py-1.5 bg-white/90">
-        {navLinks.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium ${
-                isActive ? "bg-rose-50 text-rose-600" : "text-foreground/70"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
 }

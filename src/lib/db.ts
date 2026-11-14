@@ -97,7 +97,10 @@ export function isPostgresConfigured(): boolean {
 }
 
 export function isEphemeralWarning(): boolean {
-  return !isPostgresConfigured() && process.env.VERCEL === "1";
+  return (
+    !isPostgresConfigured() &&
+    (process.env.VERCEL === "1" || process.env.NETLIFY === "true")
+  );
 }
 
 // Singleton Postgres Pool across hot reloads / warm serverless instances
@@ -953,3 +956,4 @@ export async function getAllAdminData(): Promise<{
     };
   });
 }
+

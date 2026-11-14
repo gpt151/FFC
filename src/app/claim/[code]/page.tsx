@@ -13,15 +13,6 @@ import {
   Separator,
   Spinner,
 } from "@heroui/react";
-import {
-  Award,
-  CheckCircle2,
-  Gift,
-  Lock,
-  LogIn,
-  Mail,
-  Sparkles,
-} from "lucide-react";
 
 interface ClaimLookupData {
   redPacketCode: string;
@@ -34,7 +25,6 @@ interface ClaimLookupData {
   senderName: string;
   hasPassphrase: boolean;
   status: "active" | "completed" | "expired" | "canceled";
-  expiresAt: string | null;
   allowManualClaimEmail: boolean;
   userClaimedAmount: string | null;
   claims: Array<{
@@ -82,7 +72,7 @@ export default function ClaimRedPacketPage() {
       setData(lookupJson.data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载红包失败");
+      setError(err instanceof Error ? err.message : "加载失败");
     } finally {
       setLoading(false);
     }
@@ -109,7 +99,7 @@ export default function ClaimRedPacketPage() {
         }
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "加载红包失败");
+        if (active) setError(err instanceof Error ? err.message : "加载失败");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -151,28 +141,26 @@ export default function ClaimRedPacketPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
+      <div className="min-h-[45vh] flex items-center justify-center">
         <Spinner size="lg" />
-        <p className="text-sm text-muted">正在拆封红包信息...</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="max-w-md mx-auto py-12 space-y-4">
+      <div className="max-w-[420px] mx-auto py-12 space-y-4">
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>无法打开红包</Alert.Title>
-            <Alert.Description>{error || "红包不存在或尚未激活"}</Alert.Description>
+            <Alert.Description>{error || "红包不存在"}</Alert.Description>
           </Alert.Content>
         </Alert>
-        <div className="text-center">
-          <Link href="/claim">
-            <Button variant="secondary">重新输入激活码</Button>
-          </Link>
-        </div>
+        <Link href="/claim">
+          <Button variant="secondary" fullWidth>
+            重新输入
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -181,117 +169,75 @@ export default function ClaimRedPacketPage() {
   const canClaim = data.status === "active" && data.remainingCount > 0 && !alreadyClaimedAmount;
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      {/* Main Red Envelope Card */}
-      <Card className="border-none shadow-2xl overflow-hidden red-envelope-gradient text-white">
-        <Card.Content className="p-6 sm:p-8 text-center space-y-5">
-          <div className="flex items-center justify-between text-xs text-white/80">
-            <span className="font-mono bg-white/15 px-2.5 py-1 rounded-full">
-              {data.redPacketCode}
-            </span>
-            <Chip color="warning" variant="soft" size="sm">
-              <Chip.Label>
-                {data.packetType === "lucky" ? "拼手气红包" : "普通红包"}
-              </Chip.Label>
-            </Chip>
+    <div className="max-w-[440px] mx-auto space-y-5 pt-2 sm:pt-4">
+      <Card className="border-none shadow-sm overflow-hidden envelope-surface text-white">
+        <Card.Content className="p-7 text-center space-y-4">
+          <div className="flex items-center justify-between text-[11px] text-white/70">
+            <span className="font-mono">{data.redPacketCode}</span>
+            <span>{data.packetType === "lucky" ? "拼手气" : "等额"}</span>
           </div>
 
-          <div className="space-y-2 pt-2">
-            <div className="w-16 h-16 mx-auto rounded-full gold-shimmer text-zinc-950 flex items-center justify-center shadow-lg">
-              <Gift className="w-8 h-8" />
-            </div>
-            <div className="text-sm text-amber-200 font-medium">
-              来自 {data.senderName} 的红包
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              “{data.greeting}”
-            </h1>
+          <div className="space-y-1.5 py-2">
+            <div className="text-xs text-white/75">{data.senderName}</div>
+            <h1 className="text-xl font-semibold tracking-tight">{data.greeting}</h1>
           </div>
 
           {alreadyClaimedAmount ? (
-            <div className="rounded-2xl bg-white/15 backdrop-blur-xs border border-amber-300/40 p-5 space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 text-amber-200 text-xs font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                恭喜！已实时转账至您的 Lyt IT Pay 账户
-              </div>
-              <div className="text-4xl font-black text-amber-200">
-                +{alreadyClaimedAmount} <span className="text-lg">Lyt</span>
+            <div className="rounded-xl bg-black/15 border border-white/15 p-4 space-y-1">
+              <div className="text-[11px] text-white/75">已转入 Lyt IT Pay</div>
+              <div className="text-3xl font-semibold tabular-nums text-amber-200">
+                +{alreadyClaimedAmount} <span className="text-sm font-normal">Lyt</span>
               </div>
               {claimedResult?.emailMasked && (
-                <div className="text-xs text-white/80">
-                  收款账户：{claimedResult.emailMasked}
-                </div>
+                <div className="text-[11px] text-white/70">{claimedResult.emailMasked}</div>
               )}
             </div>
           ) : data.status !== "active" || data.remainingCount <= 0 ? (
-            <div className="rounded-2xl bg-black/20 p-4 text-sm text-white/90">
+            <div className="rounded-xl bg-black/15 p-3 text-xs text-white/85">
               {data.status === "expired"
-                ? "很遗憾，该红包已超过有效期"
+                ? "已过期"
                 : data.status === "canceled"
-                  ? "该红包已被取消"
-                  : "手慢了，红包已被全部领完啦！"}
+                  ? "已取消"
+                  : "已领完"}
             </div>
           ) : null}
 
-          <div className="text-xs text-white/80">
-            总金额 {data.packetAmount} Lyt · 剩余 {data.remainingCount}/{data.totalCount} 份
+          <div className="text-[11px] text-white/70 tabular-nums">
+            总额 {data.packetAmount} Lyt · 剩余 {data.remainingCount}/{data.totalCount}
           </div>
         </Card.Content>
       </Card>
 
-      {/* Claim Action Card */}
       {canClaim && (
-        <Card className="border border-black/5 shadow-lg bg-white">
-          <Card.Content className="p-6 space-y-5">
+        <Card className="border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] bg-white">
+          <Card.Content className="p-6 space-y-4">
             <form onSubmit={handleClaim} className="space-y-4">
               {userEmail ? (
-                <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs text-emerald-700 font-medium">
-                      已通过 Lyt IT Pay 授权验证身份
-                    </div>
-                    <div className="text-sm font-bold text-emerald-900 mt-0.5">
-                      {userEmail}
-                    </div>
-                  </div>
-                  <Chip color="success" variant="soft" size="sm">
-                    <Chip.Label>OAuth 已验证</Chip.Label>
-                  </Chip>
+                <div className="flex items-center justify-between text-xs p-3 rounded-xl bg-zinc-50 border border-black/[0.05]">
+                  <span className="text-zinc-500">收款账户</span>
+                  <span className="font-medium text-zinc-900">{userEmail}</span>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/70">
-                    <div className="text-xs text-foreground/80">
-                      <strong className="text-rose-700 block text-sm">
-                        推荐：Lyt IT Pay 一键授权领取
-                      </strong>
-                      无需手动输入邮箱，自动获取账户并秒速入账
-                    </div>
-                    <Link
-                      href={`/api/auth/login?returnTo=${encodeURIComponent(`/claim/${code}`)}`}
-                      className="shrink-0"
-                    >
-                      <Button variant="primary" size="sm">
-                        <LogIn className="w-3.5 h-3.5" />
-                        一键授权
-                      </Button>
-                    </Link>
-                  </div>
+                  <Link
+                    href={`/api/auth/login?returnTo=${encodeURIComponent(`/claim/${code}`)}`}
+                    className="block"
+                  >
+                    <Button variant="secondary" fullWidth>
+                      Lyt IT Pay 授权领取
+                    </Button>
+                  </Link>
 
                   {data.allowManualClaimEmail && (
                     <>
-                      <div className="flex items-center gap-3 text-xs text-muted">
+                      <div className="flex items-center gap-3 text-[11px] text-zinc-400">
                         <Separator className="flex-1" />
-                        <span>或手动填写 Lyt IT Pay 收款邮箱</span>
+                        <span>或</span>
                         <Separator className="flex-1" />
                       </div>
                       <div className="space-y-1.5">
-                        <Label
-                          htmlFor="claimer-email"
-                          className="text-sm font-medium flex items-center gap-1.5"
-                        >
-                          <Mail className="w-4 h-4 text-rose-600" />
-                          Lyt IT Pay 注册邮箱
+                        <Label htmlFor="claimer-email" className="text-xs font-medium text-zinc-500">
+                          Lyt IT Pay 邮箱
                         </Label>
                         <Input
                           id="claimer-email"
@@ -300,7 +246,7 @@ export default function ClaimRedPacketPage() {
                           fullWidth
                           value={manualEmail}
                           onChange={(e) => setManualEmail(e.target.value)}
-                          placeholder="请输入已激活的 Lyt IT Pay 邮箱"
+                          placeholder="name@example.com"
                         />
                       </div>
                     </>
@@ -310,12 +256,8 @@ export default function ClaimRedPacketPage() {
 
               {data.hasPassphrase && (
                 <div className="space-y-1.5">
-                  <Label
-                    htmlFor="claim-passphrase"
-                    className="text-sm font-medium flex items-center gap-1.5"
-                  >
-                    <Lock className="w-4 h-4 text-rose-600" />
-                    请输入红包口令
+                  <Label htmlFor="claim-passphrase" className="text-xs font-medium text-zinc-500">
+                    口令
                   </Label>
                   <Input
                     id="claim-passphrase"
@@ -324,7 +266,7 @@ export default function ClaimRedPacketPage() {
                     fullWidth
                     value={passphrase}
                     onChange={(e) => setPassphrase(e.target.value)}
-                    placeholder="输入发红包人设置的口令"
+                    placeholder="输入领取口令"
                   />
                 </div>
               )}
@@ -344,18 +286,15 @@ export default function ClaimRedPacketPage() {
                 size="lg"
                 fullWidth
                 isDisabled={claiming || (!userEmail && !data.allowManualClaimEmail)}
-                className="font-bold text-base shadow-md"
+                className="font-medium"
               >
                 {claiming ? (
                   <>
                     <Spinner size="sm" color="current" />
-                    正在拆红包并打款中...
+                    拆包中...
                   </>
                 ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    开 · 拆红包立即到账
-                  </>
+                  "拆红包"
                 )}
               </Button>
             </form>
@@ -363,37 +302,32 @@ export default function ClaimRedPacketPage() {
         </Card>
       )}
 
-      {/* Leaderboard / Claims list */}
-      <Card className="border border-black/5 bg-white">
-        <Card.Header>
-          <Card.Title className="text-base font-bold">
-            领取手气榜 ({data.claims.length}/{data.totalCount})
-          </Card.Title>
-        </Card.Header>
-        <Card.Content>
+      <Card className="border border-black/[0.06] bg-white">
+        <Card.Content className="p-5 space-y-3">
+          <div className="text-xs font-medium text-zinc-500">
+            领取详情 ({data.claims.length}/{data.totalCount})
+          </div>
+          <Separator />
           {data.claims.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted">
-              还没有人拆开，快来抢第一个手气！
-            </div>
+            <div className="py-5 text-center text-xs text-zinc-400">暂无领取</div>
           ) : (
-            <div className="divide-y divide-black/5">
+            <div className="divide-y divide-black/[0.05]">
               {data.claims.map((c) => (
-                <div key={c.id} className="py-3 flex items-center justify-between gap-3">
+                <div key={c.id} className="py-2.5 flex items-center justify-between text-sm">
                   <div>
-                    <div className="text-sm font-medium flex items-center gap-2">
-                      {c.maskedEmail}
+                    <div className="flex items-center gap-2 text-zinc-800">
+                      <span>{c.maskedEmail}</span>
                       {c.isBestLuck && (
                         <Chip color="warning" variant="soft" size="sm">
-                          <Award className="w-3 h-3 mr-0.5 inline" />
-                          <Chip.Label>手气最佳</Chip.Label>
+                          <Chip.Label className="text-[11px]">手气最佳</Chip.Label>
                         </Chip>
                       )}
                     </div>
-                    <div className="text-xs text-muted">
+                    <div className="text-[11px] text-zinc-400">
                       {new Date(c.claimedAt).toLocaleString("zh-CN")}
                     </div>
                   </div>
-                  <div className="font-bold text-rose-600">{c.amount} Lyt</div>
+                  <div className="font-medium tabular-nums text-zinc-900">{c.amount} Lyt</div>
                 </div>
               ))}
             </div>

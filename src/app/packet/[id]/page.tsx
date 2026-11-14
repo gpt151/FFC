@@ -13,14 +13,9 @@ import {
 } from "@heroui/react";
 import {
   Check,
-  CheckCircle2,
-  Clock,
   Copy,
   ExternalLink,
-  Gift,
   RefreshCw,
-  Share2,
-  Sparkles,
 } from "lucide-react";
 import { QrCodeBox } from "@/components/QrCodeBox";
 
@@ -35,16 +30,12 @@ interface PacketDetail {
   feeAmount: string;
   totalPayAmount: string;
   feeRate: number;
-  feeMode: string;
   greeting: string;
   senderName: string;
-  hasPassphrase: boolean;
   paymentLinkCode: string;
   paymentUrl: string;
-  payerEmailMasked: string | null;
   createdAt: string;
   paidAt: string | null;
-  expiresAt: string | null;
   redPacketCode: string | null;
   claims: Array<{
     id: number;
@@ -78,12 +69,12 @@ export default function PacketOrderPage() {
         );
         const json = await res.json();
         if (!res.ok || json.status !== "success") {
-          throw new Error(json.message || "查询订单失败");
+          throw new Error(json.message || "查询失败");
         }
         setPacket(json.data);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "查询订单失败");
+        setError(err instanceof Error ? err.message : "查询失败");
       } finally {
         setLoading(false);
       }
@@ -98,14 +89,14 @@ export default function PacketOrderPage() {
       .then(({ ok, json }) => {
         if (!active) return;
         if (!ok || json.status !== "success") {
-          setError(json.message || "查询订单失败");
+          setError(json.message || "查询失败");
         } else {
           setPacket(json.data);
           setError(null);
         }
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "查询订单失败");
+        if (active) setError(err instanceof Error ? err.message : "查询失败");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -115,7 +106,6 @@ export default function PacketOrderPage() {
     };
   }, [publicId]);
 
-  // Poll every 3.5s while awaiting payment, or every 8s while active for live claim updates
   useEffect(() => {
     if (!packet) return;
     if (packet.status === "awaiting_payment") {
@@ -143,260 +133,210 @@ export default function PacketOrderPage() {
   const copyText = async (key: string, text: string) => {
     await navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+    setTimeout(() => setCopiedKey(null), 1800);
   };
 
   if (loading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
+      <div className="min-h-[45vh] flex items-center justify-center">
         <Spinner size="lg" />
-        <p className="text-sm text-muted">正在加载红包订单信息...</p>
       </div>
     );
   }
 
   if (error || !packet) {
     return (
-      <div className="max-w-lg mx-auto py-12">
+      <div className="max-w-[440px] mx-auto py-12 space-y-4">
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>加载失败</Alert.Title>
             <Alert.Description>{error || "订单不存在"}</Alert.Description>
           </Alert.Content>
         </Alert>
-        <div className="mt-4 text-center">
-          <Link href="/">
-            <Button variant="secondary">返回包红包</Button>
-          </Link>
-        </div>
+        <Link href="/">
+          <Button variant="secondary" fullWidth>
+            返回
+          </Button>
+        </Link>
       </div>
     );
   }
 
-  const claimUrl = packet.redPacketCode
-    ? `${origin}/claim/${packet.redPacketCode}`
-    : "";
-
-  const shareMessage = packet.redPacketCode
-    ? `🧧 ${packet.senderName} 发了一个 Lyt IT Pay ${packet.packetType === "lucky" ? "拼手气" : "普通"}红包：「${packet.greeting}」\n🎫 红包激活码：${packet.redPacketCode}\n🔗 点击立即领取：${claimUrl}`
-    : "";
+  const claimUrl = packet.redPacketCode ? `${origin}/claim/${packet.redPacketCode}` : "";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header status bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="max-w-[480px] mx-auto space-y-5 pt-2 sm:pt-4">
+      <div className="flex items-center justify-between px-1">
         <div>
-          <div className="text-xs text-muted">订单编号：{packet.publicId}</div>
-          <h1 className="text-2xl font-bold tracking-tight mt-0.5">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
             {packet.status === "awaiting_payment"
-              ? "等待完成 Lyt IT Pay 付款"
+              ? "等待付款"
               : packet.status === "canceled"
-                ? "订单已取消"
-                : "红包已激活 · 立即分享给好友"}
+                ? "已取消"
+                : "红包已激活"}
           </h1>
+          <div className="text-xs text-zinc-400 font-mono mt-0.5">{packet.publicId}</div>
         </div>
         <Chip
+          size="sm"
+          variant="soft"
           color={
             packet.status === "active"
               ? "success"
-              : packet.status === "completed"
-                ? "accent"
-                : packet.status === "awaiting_payment"
-                  ? "warning"
-                  : "danger"
+              : packet.status === "awaiting_payment"
+                ? "warning"
+                : "default"
           }
-          variant="soft"
         >
           <Chip.Label>
-            {packet.status === "awaiting_payment" && "待付款激活"}
-            {packet.status === "active" && `领取中 (${packet.totalCount - packet.remainingCount}/${packet.totalCount})`}
-            {packet.status === "completed" && "已全部领完"}
+            {packet.status === "awaiting_payment" && "待付款"}
+            {packet.status === "active" &&
+              `${packet.totalCount - packet.remainingCount}/${packet.totalCount} 已领`}
+            {packet.status === "completed" && "已领完"}
             {packet.status === "expired" && "已过期"}
             {packet.status === "canceled" && "已取消"}
           </Chip.Label>
         </Chip>
       </div>
 
-      {/* Awaiting payment view */}
       {packet.status === "awaiting_payment" && (
-        <Card className="border border-rose-200 shadow-lg bg-white">
-          <Card.Content className="p-6 sm:p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              <div className="md:col-span-7 space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-                  <Clock className="w-3.5 h-3.5 animate-pulse" />
-                  系统每 3 秒自动检测 Lyt IT Pay 付款结果
-                </div>
-
-                <div>
-                  <div className="text-sm text-muted">需支付总金额（含 {(packet.feeRate * 100).toFixed(0)}% 手续费）</div>
-                  <div className="text-4xl font-extrabold text-rose-600 mt-1">
-                    {packet.totalPayAmount} <span className="text-lg font-semibold">Lyt</span>
-                  </div>
-                  <div className="text-xs text-muted mt-1">
-                    红包净额 {packet.packetAmount} Lyt（{packet.totalCount}个） + 手续费 {packet.feeAmount} Lyt
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3 pt-1">
-                  <a href={packet.paymentUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="primary" size="lg" className="font-semibold">
-                      前往 Lyt IT Pay 立即付款
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </a>
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    isDisabled={checking}
-                    onPress={handleManualVerify}
-                  >
-                    <RefreshCw className={`w-4 h-4 ${checking ? "animate-spin" : ""}`} />
-                    我已付款，立即核验
-                  </Button>
-                </div>
-
-                <div className="p-3 rounded-xl bg-black/[0.03] border border-black/5 flex items-center justify-between gap-2">
-                  <div className="truncate text-xs font-mono text-foreground/80">
-                    {packet.paymentUrl}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onPress={() => copyText("payurl", packet.paymentUrl)}
-                  >
-                    {copiedKey === "payurl" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedKey === "payurl" ? "已复制" : "复制链接"}
-                  </Button>
-                </div>
+        <Card className="border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] bg-white">
+          <Card.Content className="p-6 sm:p-7 space-y-6">
+            <div className="text-center space-y-1">
+              <div className="text-xs text-zinc-500">应付金额</div>
+              <div className="text-4xl font-semibold tracking-tight tabular-nums text-zinc-900">
+                {packet.totalPayAmount} <span className="text-base font-normal text-zinc-500">Lyt</span>
               </div>
-
-              <div className="md:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-rose-50/50 border border-rose-100">
-                <QrCodeBox value={packet.paymentUrl} size={176} />
-                <span className="text-xs text-muted mt-3">使用手机扫码打开 Lyt IT Pay 收银台</span>
-                <span className="text-[11px] font-mono text-muted mt-1">
-                  链接码：{packet.paymentLinkCode}
-                </span>
+              <div className="text-xs text-zinc-400 tabular-nums">
+                红包 {packet.packetAmount} · 手续费 {packet.feeAmount}
               </div>
             </div>
 
-            <Separator />
+            <div className="flex justify-center">
+              <QrCodeBox value={packet.paymentUrl} size={172} />
+            </div>
 
-            <div className="text-xs text-muted leading-relaxed">
-              付款完成后，系统将自动激活红包，并在本页面直接生成<strong>红包激活码</strong>与<strong>领取链接</strong>（请勿关闭本页面；如果已关闭，可通过「我的记录」找回）。
+            <div className="space-y-2.5">
+              <a href={packet.paymentUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <Button variant="primary" size="lg" fullWidth className="font-medium">
+                  前往 Lyt IT Pay 付款
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </a>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="secondary"
+                  isDisabled={checking}
+                  onPress={handleManualVerify}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} />
+                  核验付款
+                </Button>
+                <Button
+                  variant="secondary"
+                  onPress={() => copyText("payurl", packet.paymentUrl)}
+                >
+                  {copiedKey === "payurl" ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  {copiedKey === "payurl" ? "已复制" : "复制收款链接"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-center text-[11px] text-zinc-400">
+              付款完成后将自动刷新并显示激活码
             </div>
           </Card.Content>
         </Card>
       )}
 
-      {/* Activated / Completed view */}
       {(packet.status === "active" || packet.status === "completed" || packet.status === "expired") &&
         packet.redPacketCode && (
           <>
-            <Card className="border-none shadow-xl overflow-hidden red-envelope-gradient text-white">
-              <Card.Content className="p-6 sm:p-8 space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+            <Card className="border-none shadow-sm overflow-hidden envelope-surface text-white">
+              <Card.Content className="p-6 sm:p-7 space-y-5">
+                <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 text-amber-200 text-xs font-medium">
-                      <CheckCircle2 className="w-4 h-4" />
-                      付款已确认 · 红包已激活生效
+                    <div className="text-xs text-white/75">
+                      {packet.packetType === "lucky" ? "拼手气" : "等额"} · {packet.packetAmount} Lyt · 剩余{" "}
+                      {packet.remainingCount}/{packet.totalCount}
                     </div>
-                    <h2 className="text-2xl font-bold">“{packet.greeting}”</h2>
-                    <p className="text-xs text-white/80">
-                      {packet.packetType === "lucky" ? "拼手气红包" : "普通等额红包"} · 总额{" "}
-                      {packet.packetAmount} Lyt · 剩余 {packet.remainingCount}/{packet.totalCount} 份
-                    </p>
+                    <h2 className="text-xl font-semibold leading-snug">{packet.greeting}</h2>
                   </div>
-                  <div className="bg-white p-2 rounded-2xl shadow-lg">
-                    <QrCodeBox value={claimUrl} size={132} />
+                  <div className="bg-white p-1.5 rounded-xl shrink-0">
+                    <QrCodeBox value={claimUrl} size={96} />
                   </div>
                 </div>
 
-                {/* Red packet code & Claim Link */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-white/15 backdrop-blur-xs p-4 space-y-2 border border-white/20">
-                    <div className="text-xs text-white/80">红包激活码（可凭码领取）</div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xl font-extrabold font-mono tracking-wider text-amber-200">
-                        {packet.redPacketCode}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onPress={() => copyText("code", packet.redPacketCode!)}
-                      >
-                        {copiedKey === "code" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedKey === "code" ? "已复制" : "复制"}
-                      </Button>
+                <div className="rounded-xl bg-black/15 border border-white/15 p-3.5 flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] text-white/70">激活码</div>
+                    <div className="font-mono text-lg font-semibold tracking-wider">
+                      {packet.redPacketCode}
                     </div>
                   </div>
-
-                  <div className="rounded-2xl bg-white/15 backdrop-blur-xs p-4 space-y-2 border border-white/20">
-                    <div className="text-xs text-white/80">一键领取链接</div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-mono truncate text-white/95">{claimUrl}</span>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onPress={() => copyText("link", claimUrl)}
-                      >
-                        {copiedKey === "link" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedKey === "link" ? "已复制" : "复制"}
-                      </Button>
-                    </div>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => copyText("code", packet.redPacketCode!)}
+                  >
+                    {copiedKey === "code" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedKey === "code" ? "已复制" : "复制"}
+                  </Button>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onPress={() => copyText("share", shareMessage)}
-                    className="font-semibold"
+                    fullWidth
+                    onPress={() => copyText("link", claimUrl)}
                   >
-                    <Share2 className="w-4 h-4" />
-                    {copiedKey === "share" ? "已复制完整转发文案！" : "复制群聊转发文案"}
+                    {copiedKey === "link" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedKey === "link" ? "已复制领取链接" : "复制领取链接"}
                   </Button>
-                  <Link href={`/claim/${packet.redPacketCode}`}>
+                  <Link href={`/claim/${packet.redPacketCode}`} className="shrink-0">
                     <Button variant="ghost" className="text-white hover:bg-white/15">
-                      <Gift className="w-4 h-4" />
-                      打开领取页面预览
+                      打开
                     </Button>
                   </Link>
                 </div>
               </Card.Content>
             </Card>
 
-            {/* Claims feed */}
-            <Card className="border border-black/5 bg-white">
-              <Card.Header>
+            <Card className="border border-black/[0.06] bg-white">
+              <Card.Content className="p-5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Card.Title className="text-base font-bold flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-rose-600" />
-                    实时领取记录 ({packet.claims.length}/{packet.totalCount})
-                  </Card.Title>
-                  <Button size="sm" variant="ghost" onPress={() => fetchStatus(false)}>
-                    <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium text-zinc-500">
+                    领取记录 ({packet.claims.length}/{packet.totalCount})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => fetchStatus(false)}
+                    className="text-xs text-zinc-400 hover:text-zinc-900 cursor-pointer"
+                  >
                     刷新
-                  </Button>
+                  </button>
                 </div>
-              </Card.Header>
-              <Card.Content>
+                <Separator />
                 {packet.claims.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted">
-                    暂无人领取，快把激活码或领取链接分享给好友吧！
-                  </div>
+                  <div className="py-6 text-center text-xs text-zinc-400">暂无领取</div>
                 ) : (
-                  <div className="divide-y divide-black/5">
+                  <div className="divide-y divide-black/[0.05]">
                     {packet.claims.map((c) => (
-                      <div key={c.id} className="py-3 flex items-center justify-between">
+                      <div key={c.id} className="py-2.5 flex items-center justify-between text-sm">
                         <div>
-                          <div className="text-sm font-medium">{c.maskedEmail}</div>
-                          <div className="text-xs text-muted">
+                          <div className="text-zinc-800">{c.maskedEmail}</div>
+                          <div className="text-[11px] text-zinc-400">
                             {new Date(c.claimedAt).toLocaleString("zh-CN")}
                           </div>
                         </div>
-                        <div className="font-bold text-rose-600">{c.amount} Lyt</div>
+                        <div className="font-medium tabular-nums text-zinc-900">
+                          {c.amount} Lyt
+                        </div>
                       </div>
                     ))}
                   </div>

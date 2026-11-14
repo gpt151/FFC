@@ -3,20 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Chip, Spinner, Tabs } from "@heroui/react";
-import { ArrowUpRight, Gift, LogIn, Send } from "lucide-react";
 
 interface SentItem {
   publicId: string;
   redPacketCode: string | null;
-  packetType: "lucky" | "fixed";
   totalCount: number;
   remainingCount: number;
   packetAmount: string;
-  feeAmount: string;
   totalPayAmount: string;
   greeting: string;
   status: string;
-  createdAt: string;
 }
 
 interface ReceivedItem {
@@ -62,19 +58,15 @@ export default function MyRecordsPage() {
 
   if (!user) {
     return (
-      <div className="max-w-md mx-auto py-12">
-        <Card className="border border-black/5 shadow-lg bg-white text-center">
-          <Card.Content className="p-8 space-y-4">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <LogIn className="w-6 h-6" />
+      <div className="max-w-[400px] mx-auto py-12">
+        <Card className="border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] bg-white">
+          <Card.Content className="p-7 text-center space-y-4">
+            <div className="space-y-1">
+              <h1 className="text-lg font-semibold text-zinc-900">我的记录</h1>
+              <p className="text-xs text-zinc-500">授权登录后查看发出与领到的红包</p>
             </div>
-            <h1 className="text-xl font-bold">授权查看我的红包记录</h1>
-            <p className="text-sm text-muted">
-              通过 Lyt IT Pay 官方 OAuth 授权登录后，即可同步查看您发出的全部红包与领取记录。
-            </p>
             <Link href="/api/auth/login?returnTo=/my" className="block">
-              <Button variant="primary" size="lg" fullWidth>
-                <LogIn className="w-4 h-4" />
+              <Button variant="primary" fullWidth>
                 Lyt IT Pay 授权登录
               </Button>
             </Link>
@@ -85,16 +77,15 @@ export default function MyRecordsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="max-w-2xl mx-auto space-y-5">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">我的红包记录</h1>
-          <p className="text-sm text-muted">当前绑定账号：{user.email}</p>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">记录</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">{user.email}</p>
         </div>
         <Link href="/">
-          <Button variant="primary">
-            <Send className="w-4 h-4" />
-            再去包一个
+          <Button size="sm" variant="primary">
+            发红包
           </Button>
         </Link>
       </div>
@@ -106,11 +97,11 @@ export default function MyRecordsPage() {
         <Tabs.ListContainer>
           <Tabs.List aria-label="记录分类">
             <Tabs.Tab id="sent">
-              我发出的红包 ({sent.length})
+              发出 ({sent.length})
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="received">
-              我领到的红包 ({received.length})
+              领到 ({received.length})
               <Tabs.Indicator />
             </Tabs.Tab>
           </Tabs.List>
@@ -118,52 +109,32 @@ export default function MyRecordsPage() {
 
         <Tabs.Panel id="sent" className="pt-4">
           {sent.length === 0 ? (
-            <Card className="bg-white border border-black/5">
-              <Card.Content className="py-12 text-center text-sm text-muted">
-                您还没有发出过红包
-              </Card.Content>
-            </Card>
+            <div className="py-12 text-center text-xs text-zinc-400">暂无记录</div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-black/[0.05] rounded-2xl border border-black/[0.06] bg-white">
               {sent.map((p) => (
-                <Card key={p.publicId} className="bg-white border border-black/5">
-                  <Card.Content className="p-4 flex flex-wrap items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">{p.greeting}</span>
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={
-                            p.status === "active"
-                              ? "success"
-                              : p.status === "awaiting_payment"
-                                ? "warning"
-                                : "default"
-                          }
-                        >
-                          <Chip.Label>{p.status}</Chip.Label>
-                        </Chip>
-                      </div>
-                      <div className="text-xs text-muted flex flex-wrap gap-3">
-                        <span>总额 {p.packetAmount} Lyt（实付 {p.totalPayAmount}）</span>
-                        <span>剩余 {p.remainingCount}/{p.totalCount} 份</span>
-                        {p.redPacketCode && (
-                          <span className="font-mono text-rose-600 font-semibold">
-                            码: {p.redPacketCode}
-                          </span>
-                        )}
-                      </div>
+                <div key={p.publicId} className="p-4 flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-zinc-900">{p.greeting}</span>
+                      <Chip size="sm" variant="soft">
+                        <Chip.Label className="text-[11px]">{p.status}</Chip.Label>
+                      </Chip>
                     </div>
-
-                    <Link href={`/packet/${p.publicId}`}>
-                      <Button size="sm" variant="secondary">
-                        查看详情
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Button>
-                    </Link>
-                  </Card.Content>
-                </Card>
+                    <div className="text-xs text-zinc-400 tabular-nums flex flex-wrap gap-3">
+                      <span>{p.packetAmount} Lyt</span>
+                      <span>
+                        {p.totalCount - p.remainingCount}/{p.totalCount}
+                      </span>
+                      {p.redPacketCode && <span className="font-mono">{p.redPacketCode}</span>}
+                    </div>
+                  </div>
+                  <Link href={`/packet/${p.publicId}`}>
+                    <Button size="sm" variant="secondary">
+                      详情
+                    </Button>
+                  </Link>
+                </div>
               ))}
             </div>
           )}
@@ -171,35 +142,24 @@ export default function MyRecordsPage() {
 
         <Tabs.Panel id="received" className="pt-4">
           {received.length === 0 ? (
-            <Card className="bg-white border border-black/5">
-              <Card.Content className="py-12 text-center text-sm text-muted">
-                您还没有领到过红包
-              </Card.Content>
-            </Card>
+            <div className="py-12 text-center text-xs text-zinc-400">暂无记录</div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-black/[0.05] rounded-2xl border border-black/[0.06] bg-white">
               {received.map((c) => (
-                <Card key={c.id} className="bg-white border border-black/5">
-                  <Card.Content className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <Gift className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm">
-                          {c.senderName} · “{c.greeting}”
-                        </div>
-                        <div className="text-xs text-muted">
-                          红包码 {c.redPacketCode} ·{" "}
-                          {new Date(c.claimedAt).toLocaleString("zh-CN")}
-                        </div>
-                      </div>
+                <div key={c.id} className="p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-zinc-900">
+                      {c.senderName} · {c.greeting}
                     </div>
-                    <div className="text-lg font-extrabold text-rose-600">
-                      +{c.amount} Lyt
+                    <div className="text-xs text-zinc-400 mt-0.5">
+                      <span className="font-mono">{c.redPacketCode}</span> ·{" "}
+                      {new Date(c.claimedAt).toLocaleString("zh-CN")}
                     </div>
-                  </Card.Content>
-                </Card>
+                  </div>
+                  <div className="text-sm font-semibold tabular-nums text-zinc-900">
+                    +{c.amount} Lyt
+                  </div>
+                </div>
               ))}
             </div>
           )}

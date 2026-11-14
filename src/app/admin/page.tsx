@@ -15,20 +15,10 @@ import {
   Tabs,
 } from "@heroui/react";
 import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  CheckCircle2,
-  Coins,
   Download,
-  Eye,
-  Lock,
   LogOut,
   RefreshCw,
   Search,
-  Settings,
-  ShieldCheck,
-  Wallet,
 } from "lucide-react";
 
 interface AdminPacket {
@@ -146,7 +136,6 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPacket, setSelectedPacket] = useState<AdminPacket | null>(null);
 
-  // Settings form state
   const [feePercent, setFeePercent] = useState("5");
   const [feeRecipient, setFeeRecipient] = useState("1218545105@qq.com");
   const [feeMode, setFeeMode] = useState<"sender_pays" | "deduct_from_packet">("sender_pays");
@@ -221,7 +210,7 @@ export default function AdminPage() {
       });
       const json = await res.json();
       if (!res.ok || json.status !== "success") {
-        throw new Error(json.message || "登录失败");
+        throw new Error(json.message || "密码错误");
       }
       setAuthenticated(true);
       await Promise.all([loadDashboard(), loadMerchant()]);
@@ -252,7 +241,7 @@ export default function AdminPage() {
     if (!res.ok || json.status === "error") {
       setActionMsg({ type: "danger", text: json.message || "操作失败" });
     } else {
-      setActionMsg({ type: "success", text: json.message || "操作成功" });
+      setActionMsg({ type: "success", text: json.message || "已完成" });
       await loadDashboard();
     }
   };
@@ -279,12 +268,12 @@ export default function AdminPage() {
         throw new Error(json.message || "保存失败");
       }
       setMerchantPassword("");
-      setActionMsg({ type: "success", text: "平台配置已更新" });
+      setActionMsg({ type: "success", text: "配置已更新" });
       await Promise.all([loadDashboard(), loadMerchant()]);
     } catch (err) {
       setActionMsg({
         type: "danger",
-        text: err instanceof Error ? err.message : "保存配置失败",
+        text: err instanceof Error ? err.message : "保存失败",
       });
     } finally {
       setSavingSettings(false);
@@ -314,8 +303,7 @@ export default function AdminPage() {
 
   const chartMax = useMemo(() => {
     if (!dashboard) return 10;
-    const maxVol = Math.max(...dashboard.dailySeries.map((d) => d.volume), 1);
-    return maxVol;
+    return Math.max(...dashboard.dailySeries.map((d) => d.volume), 1);
   }, [dashboard]);
 
   if (authLoading) {
@@ -328,32 +316,29 @@ export default function AdminPage() {
 
   if (!authenticated) {
     return (
-      <div className="max-w-md mx-auto py-12">
-        <Card className="border border-black/5 shadow-xl bg-white">
-          <Card.Header className="text-center pb-2">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-900 text-white flex items-center justify-center mb-2">
-              <ShieldCheck className="w-6 h-6" />
+      <div className="max-w-[380px] mx-auto py-14">
+        <Card className="border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] bg-white">
+          <Card.Content className="p-6 sm:p-7 space-y-5">
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-900">管理后台</h1>
+              <p className="text-xs text-zinc-500 mt-0.5">输入密码访问流水与结算数据</p>
             </div>
-            <Card.Title className="text-xl font-bold">LytPay 红包数据后台</Card.Title>
-            <Card.Description>请输入管理员密码查看详细流水、手续费收益与对账数据</Card.Description>
-          </Card.Header>
-          <Card.Content>
+
             {usingDefaultDevPw && (
-              <Alert status="warning" className="mb-4">
+              <Alert status="warning">
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Alert.Title>本地开发默认密码提示</Alert.Title>
                   <Alert.Description>
-                    未配置 ADMIN_PASSWORD，本地开发默认密码为 <code className="font-mono">admin123456</code>
+                    本地默认密码：<code className="font-mono">admin123456</code>
                   </Alert.Description>
                 </Alert.Content>
               </Alert>
             )}
+
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="admin-pw" className="text-sm font-medium flex items-center gap-1.5">
-                  <Lock className="w-4 h-4" />
-                  管理员密码
+                <Label htmlFor="admin-pw" className="text-xs font-medium text-zinc-500">
+                  密码
                 </Label>
                 <Input
                   id="admin-pw"
@@ -362,7 +347,7 @@ export default function AdminPage() {
                   fullWidth
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="请输入 ADMIN_PASSWORD"
+                  placeholder="ADMIN_PASSWORD"
                 />
               </div>
               {loginError && (
@@ -373,8 +358,8 @@ export default function AdminPage() {
                   </Alert.Content>
                 </Alert>
               )}
-              <Button type="submit" variant="primary" size="lg" fullWidth isDisabled={loggingIn}>
-                {loggingIn ? <Spinner size="sm" color="current" /> : "进入管理后台"}
+              <Button type="submit" variant="primary" fullWidth isDisabled={loggingIn}>
+                {loggingIn ? <Spinner size="sm" color="current" /> : "登录"}
               </Button>
             </form>
           </Card.Content>
@@ -391,23 +376,16 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-rose-600" />
-            LytPay 红包运营数据后台
-          </h1>
-          <p className="text-xs text-muted mt-0.5">
-            手续费收款账户：
-            <strong className="text-foreground">
-              {dashboard?.settings.feeRecipientEmail || "1218545105@qq.com"}
-            </strong>{" "}
-            ({((dashboard?.settings.feeRate ?? 0.05) * 100).toFixed(1)}%)
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">数据后台</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            抽成账户 {dashboard?.settings.feeRecipientEmail || "1218545105@qq.com"} ·{" "}
+            {((dashboard?.settings.feeRate ?? 0.05) * 100).toFixed(1)}%
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -418,11 +396,10 @@ export default function AdminPage() {
             }}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
-            刷新全量数据
+            刷新
           </Button>
           <Button size="sm" variant="ghost" onPress={handleLogout}>
             <LogOut className="w-3.5 h-3.5" />
-            退出后台
           </Button>
         </div>
       </div>
@@ -431,9 +408,8 @@ export default function AdminPage() {
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>当前在 Vercel 运行且未绑定 PostgreSQL 数据库</Alert.Title>
             <Alert.Description>
-              请在 Vercel 项目中添加 Neon / Supabase / Postgres 并设置 `DATABASE_URL`（或 `POSTGRES_URL`），否则数据无法跨实例持久化。
+              当前为 Serverless 环境且未配置 `DATABASE_URL` / `POSTGRES_URL`，请绑定 Postgres 数据库以持久化数据。
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -448,118 +424,107 @@ export default function AdminPage() {
         </Alert>
       )}
 
-      {/* KPI Cards */}
+      {/* Minimalist KPI Strip */}
       {dashboard && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white border border-black/5">
-            <Card.Content className="p-5 space-y-1">
-              <div className="text-xs text-muted flex items-center justify-between">
-                <span>累计实付流水总额</span>
-                <Wallet className="w-4 h-4 text-rose-600" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border border-black/[0.06] bg-white">
+            <Card.Content className="p-4 space-y-1">
+              <div className="text-xs text-zinc-500">实付流水</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">
+                {dashboard.summary.totalVolume} <span className="text-xs font-normal text-zinc-400">Lyt</span>
               </div>
-              <div className="text-2xl font-extrabold">{dashboard.summary.totalVolume} Lyt</div>
-              <div className="text-xs text-muted">
-                已付款 {dashboard.summary.paidPacketsCount} 单 · 待付款{" "}
-                {dashboard.summary.awaitingPaymentCount} 单
+              <div className="text-[11px] text-zinc-400">
+                已付 {dashboard.summary.paidPacketsCount} · 待付 {dashboard.summary.awaitingPaymentCount}
               </div>
             </Card.Content>
           </Card>
 
-          <Card className="bg-white border border-black/5">
-            <Card.Content className="p-5 space-y-1">
-              <div className="text-xs text-muted flex items-center justify-between">
-                <span>5% 平台手续费总收益</span>
-                <Coins className="w-4 h-4 text-amber-600" />
+          <Card className="border border-black/[0.06] bg-white">
+            <Card.Content className="p-4 space-y-1">
+              <div className="text-xs text-zinc-500">手续费收益 (5%)</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">
+                {dashboard.summary.totalFee} <span className="text-xs font-normal text-zinc-400">Lyt</span>
               </div>
-              <div className="text-2xl font-extrabold text-amber-600">
-                {dashboard.summary.totalFee} Lyt
-              </div>
-              <div className="text-xs text-muted">
-                已结算 {dashboard.summary.settledFee} · 待补发{" "}
-                {dashboard.summary.pendingOrFailedFee}
+              <div className="text-[11px] text-zinc-400">
+                已结 {dashboard.summary.settledFee} · 待结 {dashboard.summary.pendingOrFailedFee}
               </div>
             </Card.Content>
           </Card>
 
-          <Card className="bg-white border border-black/5">
-            <Card.Content className="p-5 space-y-1">
-              <div className="text-xs text-muted flex items-center justify-between">
-                <span>红包池发放 / 领取情况</span>
-                <Activity className="w-4 h-4 text-emerald-600" />
+          <Card className="border border-black/[0.06] bg-white">
+            <Card.Content className="p-4 space-y-1">
+              <div className="text-xs text-zinc-500">已领取总额</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">
+                {dashboard.summary.totalClaimed} <span className="text-xs font-normal text-zinc-400">Lyt</span>
               </div>
-              <div className="text-2xl font-extrabold">{dashboard.summary.totalClaimed} Lyt</div>
-              <div className="text-xs text-muted">
-                总池 {dashboard.summary.totalPacketPool} · 剩余未领{" "}
-                {dashboard.summary.totalUnclaimed}
+              <div className="text-[11px] text-zinc-400">
+                {dashboard.summary.totalClaimsCount} 次领取 · 剩余 {dashboard.summary.totalUnclaimed}
               </div>
             </Card.Content>
           </Card>
 
-          <Card className="bg-white border border-black/5">
-            <Card.Content className="p-5 space-y-1">
-              <div className="text-xs text-muted flex items-center justify-between">
-                <span>托管账户实时余额</span>
-                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+          <Card className="border border-black/[0.06] bg-white">
+            <Card.Content className="p-4 space-y-1">
+              <div className="text-xs text-zinc-500">托管账户余额</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">
+                {merchant?.connected ? (
+                  <>
+                    {merchant.balance} <span className="text-xs font-normal text-zinc-400">Lyt</span>
+                  </>
+                ) : (
+                  "--"
+                )}
               </div>
-              <div className="text-2xl font-extrabold">
-                {merchant?.connected ? `${merchant.balance} Lyt` : "未连接"}
-              </div>
-              <div className="text-xs text-muted truncate">
-                {merchant?.connected
-                  ? merchant.email
-                  : merchant?.error || "请检查托管账号配置"}
+              <div className="text-[11px] text-zinc-400 truncate">
+                {merchant?.connected ? merchant.email : merchant?.error || "未连接"}
               </div>
             </Card.Content>
           </Card>
         </div>
       )}
 
-      {/* 14-day Trend SVG Chart */}
+      {/* Minimalist 14-Day Chart */}
       {dashboard && (
-        <Card className="bg-white border border-black/5">
-          <Card.Header className="pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Card.Title className="text-base font-bold">近 14 天交易流水与手续费趋势</Card.Title>
-              <div className="flex items-center gap-4 text-xs text-muted">
+        <Card className="border border-black/[0.06] bg-white">
+          <Card.Content className="p-5 space-y-3">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span className="font-medium text-zinc-900">近 14 天流水与手续费</span>
+              <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block" />
-                  实付流水 (Lyt)
+                  <span className="w-2 h-2 rounded-xs bg-zinc-900 inline-block" />
+                  流水
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-amber-400 inline-block" />
-                  5% 手续费 (Lyt)
+                  <span className="w-2 h-2 rounded-xs bg-[#c81e32] inline-block" />
+                  手续费
                 </span>
               </div>
             </div>
-          </Card.Header>
-          <Card.Content>
+
             <div className="w-full overflow-x-auto">
-              <div className="min-w-[600px] h-44 flex items-end gap-2 pt-4 pb-1">
+              <div className="min-w-[560px] h-36 flex items-end gap-2 pt-2">
                 {dashboard.dailySeries.map((d) => {
                   const volPct = Math.max(4, Math.round((d.volume / chartMax) * 100));
                   const feePct = d.volume > 0 ? Math.max(2, Math.round((d.fee / chartMax) * 100)) : 0;
                   return (
                     <div
                       key={d.date}
-                      className="flex-1 flex flex-col items-center gap-1 group"
-                      title={`${d.date}: 流水 ${d.volume} Lyt / 手续费 ${d.fee} Lyt / 领取 ${d.claimCount} 次`}
+                      className="flex-1 flex flex-col items-center gap-1.5 group"
+                      title={`${d.date}: 流水 ${d.volume} / 手续费 ${d.fee}`}
                     >
-                      <div className="text-[10px] text-muted opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        {d.volume > 0 ? d.volume.toFixed(1) : ""}
-                      </div>
-                      <div className="w-full h-28 flex items-end justify-center gap-1">
+                      <div className="w-full h-24 flex items-end justify-center gap-0.5">
                         <div
                           style={{ height: `${d.volume > 0 ? volPct : 3}%` }}
-                          className={`w-3 rounded-t-md transition-all ${
-                            d.volume > 0 ? "bg-rose-500 group-hover:bg-rose-600" : "bg-black/5"
+                          className={`w-2.5 rounded-t-xs transition-colors ${
+                            d.volume > 0 ? "bg-zinc-900 group-hover:bg-zinc-700" : "bg-zinc-100"
                           }`}
                         />
                         <div
                           style={{ height: `${feePct}%` }}
-                          className="w-2 rounded-t-md bg-amber-400"
+                          className="w-1.5 rounded-t-xs bg-[#c81e32]"
                         />
                       </div>
-                      <div className="text-[10px] text-muted font-mono">{d.date}</div>
+                      <div className="text-[10px] text-zinc-400 font-mono">{d.date}</div>
                     </div>
                   );
                 })}
@@ -569,46 +534,44 @@ export default function AdminPage() {
         </Card>
       )}
 
-      {/* Main Data Tabs */}
       <Tabs selectedKey={activeTab} onSelectionChange={(k) => setActiveTab(String(k))}>
         <Tabs.ListContainer>
-          <Tabs.List aria-label="后台面板">
+          <Tabs.List aria-label="后台板块">
             <Tabs.Tab id="packets">
-              红包订单明细 ({dashboard?.packets.length || 0})
+              红包订单 ({dashboard?.packets.length || 0})
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="claims">
-              领取打款流水 ({dashboard?.claims.length || 0})
+              领取流水 ({dashboard?.claims.length || 0})
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="merchant">
-              托管账户对账
+              官方对账
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="settings">
-              系统与手续费配置
+              设置
               <Tabs.Indicator />
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
 
-        {/* Tab 1: Packets */}
-        <Tabs.Panel id="packets" className="pt-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+        <Tabs.Panel id="packets" className="pt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
               <div className="relative flex-1 max-w-xs">
-                <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="搜索红包码 / 订单号 / 邮箱..."
-                  className="pl-9 w-full"
+                  placeholder="搜索激活码、订单号、邮箱..."
+                  className="pl-8 w-full"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 rounded-xl bg-white border border-black/10 px-3 text-sm"
+                className="h-10 rounded-xl bg-white border border-black/[0.08] px-3 text-xs"
               >
                 <option value="all">全部状态</option>
                 <option value="awaiting_payment">待付款</option>
@@ -617,116 +580,74 @@ export default function AdminPage() {
                 <option value="canceled">已取消</option>
               </select>
             </div>
-
             <a href="/api/admin/export?type=packets">
               <Button size="sm" variant="secondary">
                 <Download className="w-3.5 h-3.5" />
-                导出订单 CSV
+                导出 CSV
               </Button>
             </a>
           </div>
 
-          <Card className="bg-white border border-black/5 overflow-hidden">
+          <Card className="border border-black/[0.06] bg-white overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-black/[0.03] text-xs text-muted uppercase">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-zinc-50 border-b border-black/[0.05] text-zinc-500">
                   <tr>
-                    <th className="px-4 py-3">红包码 / 订单</th>
-                    <th className="px-4 py-3">付款人</th>
-                    <th className="px-4 py-3">实付 / 红包池</th>
-                    <th className="px-4 py-3">5% 手续费</th>
-                    <th className="px-4 py-3">领取进度</th>
-                    <th className="px-4 py-3">状态</th>
-                    <th className="px-4 py-3">操作</th>
+                    <th className="px-4 py-3 font-medium">激活码 / 订单</th>
+                    <th className="px-4 py-3 font-medium">付款人</th>
+                    <th className="px-4 py-3 font-medium">实付 / 红包池</th>
+                    <th className="px-4 py-3 font-medium">手续费</th>
+                    <th className="px-4 py-3 font-medium">进度</th>
+                    <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/5">
+                <tbody className="divide-y divide-black/[0.05]">
                   {filteredPackets.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-muted">
-                        暂无匹配的红包订单
+                      <td colSpan={7} className="px-4 py-10 text-center text-zinc-400">
+                        暂无数据
                       </td>
                     </tr>
                   ) : (
                     filteredPackets.map((p) => (
-                      <tr key={p.id} className="hover:bg-black/[0.015]">
+                      <tr key={p.id} className="hover:bg-zinc-50/60">
                         <td className="px-4 py-3">
-                          <div className="font-mono font-bold text-rose-600">
+                          <div className="font-mono font-semibold text-zinc-900">
                             {p.red_packet_code}
                           </div>
-                          <div className="text-[11px] text-muted font-mono">{p.public_id}</div>
-                          <div className="text-[11px] text-muted">
-                            {new Date(p.created_at).toLocaleString("zh-CN")}
+                          <div className="text-[11px] text-zinc-400 font-mono">{p.public_id}</div>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-700">
+                          {p.payer_email || p.sender_email || "-"}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums">
+                          <div className="font-medium text-zinc-900">
+                            {centsToStr(p.total_pay_cents)}
+                          </div>
+                          <div className="text-[11px] text-zinc-400">
+                            池 {centsToStr(p.packet_amount_cents)}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs font-medium">
-                            {p.payer_email || p.sender_email || "未记录"}
-                          </div>
-                          <div className="text-[11px] text-muted truncate max-w-[140px]">
-                            {p.greeting}
-                          </div>
+                        <td className="px-4 py-3 tabular-nums">
+                          <div className="text-zinc-900">{centsToStr(p.fee_amount_cents)}</div>
+                          <div className="text-[11px] text-zinc-400">{p.fee_transfer_status}</div>
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-zinc-700">
+                          {p.total_count - p.remaining_count}/{p.total_count}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold">{centsToStr(p.total_pay_cents)} Lyt</div>
-                          <div className="text-xs text-muted">
-                            净额 {centsToStr(p.packet_amount_cents)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-amber-700">
-                            {centsToStr(p.fee_amount_cents)} Lyt
-                          </div>
-                          <div className="text-[11px]">
-                            {p.fee_transfer_status === "completed" && (
-                              <span className="text-emerald-600">已转账抽成</span>
-                            )}
-                            {p.fee_transfer_status === "self_retained" && (
-                              <span className="text-emerald-600">同账户自留</span>
-                            )}
-                            {p.fee_transfer_status === "pending" && (
-                              <span className="text-muted">待入账</span>
-                            )}
-                            {p.fee_transfer_status === "failed" && (
-                              <span className="text-rose-600" title={p.fee_transfer_error || ""}>
-                                结算失败
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium">
-                            {p.total_count - p.remaining_count} / {p.total_count} 份
-                          </div>
-                          <div className="text-xs text-muted">
-                            余 {centsToStr(p.remaining_amount_cents)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Chip
-                            size="sm"
-                            variant="soft"
-                            color={
-                              p.status === "active"
-                                ? "success"
-                                : p.status === "completed"
-                                  ? "accent"
-                                  : p.status === "awaiting_payment"
-                                    ? "warning"
-                                    : "default"
-                            }
-                          >
-                            <Chip.Label>{p.status}</Chip.Label>
+                          <Chip size="sm" variant="soft">
+                            <Chip.Label className="text-[11px]">{p.status}</Chip.Label>
                           </Chip>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex gap-1.5">
                             <Button
                               size="sm"
                               variant="ghost"
                               onPress={() => setSelectedPacket(p)}
                             >
-                              <Eye className="w-3.5 h-3.5" />
                               明细
                             </Button>
                             {p.status === "awaiting_payment" && (
@@ -755,7 +676,7 @@ export default function AdminPage() {
                                   variant="secondary"
                                   onPress={() => handlePacketAction(p.public_id, "retry_fee")}
                                 >
-                                  补发手续费
+                                  补发
                                 </Button>
                               )}
                           </div>
@@ -769,76 +690,56 @@ export default function AdminPage() {
           </Card>
         </Tabs.Panel>
 
-        {/* Tab 2: Claims */}
-        <Tabs.Panel id="claims" className="pt-4 space-y-4">
+        <Tabs.Panel id="claims" className="pt-4 space-y-3">
           <div className="flex justify-end">
             <a href="/api/admin/export?type=claims">
               <Button size="sm" variant="secondary">
                 <Download className="w-3.5 h-3.5" />
-                导出领取流水 CSV
+                导出 CSV
               </Button>
             </a>
           </div>
-          <Card className="bg-white border border-black/5 overflow-hidden">
+          <Card className="border border-black/[0.06] bg-white overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-black/[0.03] text-xs text-muted uppercase">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-zinc-50 border-b border-black/[0.05] text-zinc-500">
                   <tr>
-                    <th className="px-4 py-3">流水 ID</th>
-                    <th className="px-4 py-3">红包码</th>
-                    <th className="px-4 py-3">领取人邮箱</th>
-                    <th className="px-4 py-3">验证方式</th>
-                    <th className="px-4 py-3">金额</th>
-                    <th className="px-4 py-3">打款状态</th>
-                    <th className="px-4 py-3">时间</th>
+                    <th className="px-4 py-3 font-medium">ID</th>
+                    <th className="px-4 py-3 font-medium">激活码</th>
+                    <th className="px-4 py-3 font-medium">领取人</th>
+                    <th className="px-4 py-3 font-medium">方式</th>
+                    <th className="px-4 py-3 font-medium">金额</th>
+                    <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">时间</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/5">
+                <tbody className="divide-y divide-black/[0.05]">
                   {!dashboard || dashboard.claims.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-muted">
-                        暂无领取记录
+                      <td colSpan={7} className="px-4 py-10 text-center text-zinc-400">
+                        暂无数据
                       </td>
                     </tr>
                   ) : (
                     dashboard.claims.map((c) => (
-                      <tr key={c.id} className="hover:bg-black/[0.015]">
-                        <td className="px-4 py-3 font-mono text-xs">#{c.id}</td>
-                        <td className="px-4 py-3 font-mono font-semibold">{c.red_packet_code}</td>
-                        <td className="px-4 py-3 text-xs font-medium">{c.claimer_email}</td>
-                        <td className="px-4 py-3">
-                          <Chip
-                            size="sm"
-                            variant="soft"
-                            color={c.claim_method === "oauth" ? "success" : "default"}
-                          >
-                            <Chip.Label>{c.claim_method === "oauth" ? "OAuth" : "手动邮箱"}</Chip.Label>
-                          </Chip>
-                        </td>
-                        <td className="px-4 py-3 font-bold text-rose-600">
+                      <tr key={c.id} className="hover:bg-zinc-50/60">
+                        <td className="px-4 py-3 font-mono text-zinc-400">#{c.id}</td>
+                        <td className="px-4 py-3 font-mono font-medium">{c.red_packet_code}</td>
+                        <td className="px-4 py-3">{c.claimer_email}</td>
+                        <td className="px-4 py-3 text-zinc-500">{c.claim_method}</td>
+                        <td className="px-4 py-3 font-medium tabular-nums">
                           {centsToStr(c.amount_cents)} Lyt
                         </td>
                         <td className="px-4 py-3">
                           <Chip
                             size="sm"
                             variant="soft"
-                            color={
-                              c.transfer_status === "completed"
-                                ? "success"
-                                : c.transfer_status === "failed"
-                                  ? "danger"
-                                  : "warning"
-                            }
+                            color={c.transfer_status === "completed" ? "success" : "danger"}
                           >
-                            <Chip.Label>{c.transfer_status}</Chip.Label>
+                            <Chip.Label className="text-[11px]">{c.transfer_status}</Chip.Label>
                           </Chip>
-                          {c.transfer_error && (
-                            <div className="text-[11px] text-rose-600 mt-1 max-w-[200px] truncate">
-                              {c.transfer_error}
-                            </div>
-                          )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted">
+                        <td className="px-4 py-3 text-zinc-400">
                           {new Date(c.claimed_at).toLocaleString("zh-CN")}
                         </td>
                       </tr>
@@ -850,99 +751,70 @@ export default function AdminPage() {
           </Card>
         </Tabs.Panel>
 
-        {/* Tab 3: Merchant Reconciliation */}
         <Tabs.Panel id="merchant" className="pt-4 space-y-4">
-          <Card className="bg-white border border-black/5">
-            <Card.Header>
+          <Card className="border border-black/[0.06] bg-white">
+            <Card.Content className="p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Card.Title className="text-base font-bold">Lyt IT Pay 托管账户对账</Card.Title>
-                  <Card.Description>
-                    实时调用官方 get_balance 与 get_transactions 接口核对账目
-                  </Card.Description>
+                  <div className="text-sm font-medium text-zinc-900">Lyt IT Pay 托管账户</div>
+                  <div className="text-xs text-zinc-400">官方余额与最近流水</div>
                 </div>
                 <Button size="sm" variant="secondary" onPress={loadMerchant}>
                   <RefreshCw className="w-3.5 h-3.5" />
-                  刷新官方流水
+                  刷新
                 </Button>
               </div>
-            </Card.Header>
-            <Card.Content className="space-y-4">
+
               {!merchant?.connected ? (
                 <Alert status="danger">
                   <Alert.Indicator />
                   <Alert.Content>
-                    <Alert.Title>托管账户未连接</Alert.Title>
-                    <Alert.Description>{merchant?.error || "请检查账号密码配置"}</Alert.Description>
+                    <Alert.Description>{merchant?.error || "未连接"}</Alert.Description>
                   </Alert.Content>
                 </Alert>
               ) : (
                 <>
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs text-emerald-700">当前托管账户</div>
-                      <div className="font-bold text-emerald-950">{merchant.email}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-emerald-700">账户可用余额</div>
-                      <div className="text-2xl font-extrabold text-emerald-700">
-                        {merchant.balance} Lyt
-                      </div>
+                  <div className="p-4 rounded-xl bg-zinc-50 border border-black/[0.05] flex items-center justify-between">
+                    <div className="text-sm font-medium text-zinc-900">{merchant.email}</div>
+                    <div className="text-lg font-semibold tabular-nums text-zinc-900">
+                      {merchant.balance} Lyt
                     </div>
                   </div>
-
-                  <div>
-                    <div className="text-sm font-semibold mb-2">最近官方交易流水 (第 1 页)</div>
-                    {txItems.length === 0 ? (
-                      <pre className="text-xs bg-black/[0.03] p-4 rounded-xl overflow-x-auto">
-                        {JSON.stringify(merchant.transactions, null, 2)}
-                      </pre>
-                    ) : (
-                      <div className="divide-y divide-black/5 border border-black/5 rounded-xl overflow-hidden">
-                        {txItems.map((tx, idx) => (
-                          <div
-                            key={String(tx.id || idx)}
-                            className="p-3 flex flex-wrap items-center justify-between gap-2 text-xs"
-                          >
-                            <div>
-                              <div className="font-semibold">
-                                {String(tx.sender_email || "")} → {String(tx.receiver_email || "")}
-                              </div>
-                              <div className="text-muted">
-                                {String(tx.note || tx.type || "")} · {String(tx.created_at || "")}
-                              </div>
+                  {txItems.length > 0 && (
+                    <div className="divide-y divide-black/[0.05] border border-black/[0.05] rounded-xl">
+                      {txItems.map((tx, idx) => (
+                        <div
+                          key={String(tx.id || idx)}
+                          className="p-3 flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="text-zinc-900">
+                              {String(tx.sender_email || "")} → {String(tx.receiver_email || "")}
                             </div>
-                            <div className="font-mono font-bold text-sm">
-                              {String(tx.amount || "0.00")} Lyt
+                            <div className="text-zinc-400 mt-0.5">
+                              {String(tx.note || tx.type || "")} · {String(tx.created_at || "")}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          <div className="font-mono font-medium tabular-nums">
+                            {String(tx.amount || "0.00")} Lyt
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </Card.Content>
           </Card>
         </Tabs.Panel>
 
-        {/* Tab 4: System Settings */}
         <Tabs.Panel id="settings" className="pt-4">
-          <Card className="bg-white border border-black/5 max-w-2xl">
-            <Card.Header>
-              <Card.Title className="text-base font-bold flex items-center gap-2">
-                <Settings className="w-4 h-4 text-rose-600" />
-                费率与托管账户配置
-              </Card.Title>
-              <Card.Description>
-                默认抽成 5% 至 1218545105@qq.com；支持在后台动态调整或覆盖环境变量
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
+          <Card className="border border-black/[0.06] bg-white max-w-xl">
+            <Card.Content className="p-6">
               <form onSubmit={handleSaveSettings} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="s-fee-rate" className="text-sm font-medium">
+                    <Label htmlFor="s-fee-rate" className="text-xs font-medium text-zinc-500">
                       手续费比例 (%)
                     </Label>
                     <Input
@@ -957,8 +829,8 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="s-fee-email" className="text-sm font-medium">
-                      手续费收款 Lyt IT Pay 账户
+                    <Label htmlFor="s-fee-email" className="text-xs font-medium text-zinc-500">
+                      手续费收款账户
                     </Label>
                     <Input
                       id="s-fee-email"
@@ -972,8 +844,8 @@ export default function AdminPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="s-fee-mode" className="text-sm font-medium">
-                    手续费计算模式
+                  <Label htmlFor="s-fee-mode" className="text-xs font-medium text-zinc-500">
+                    计费方式
                   </Label>
                   <select
                     id="s-fee-mode"
@@ -985,23 +857,17 @@ export default function AdminPage() {
                           : "sender_pays"
                       )
                     }
-                    className="w-full h-10 rounded-xl bg-black/[0.04] px-3 text-sm"
+                    className="w-full h-10 rounded-xl bg-black/[0.04] px-3 text-xs"
                   >
-                    <option value="sender_pays">
-                      外扣模式（包 100 红包 + 5% 手续费 = 付 105，领取总池 100）
-                    </option>
-                    <option value="deduct_from_packet">
-                      内扣模式（付 100，抽 5% 手续费 = 5，领取总池 95）
-                    </option>
+                    <option value="sender_pays">外扣（红包 100 + 5% 手续费 = 实付 105）</option>
+                    <option value="deduct_from_packet">内扣（实付 100，抽 5% 手续费，可领 95）</option>
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-black/[0.03]">
+                <div className="flex items-center justify-between py-2">
                   <div>
-                    <div className="text-sm font-medium">允许领取时手动输入邮箱</div>
-                    <div className="text-xs text-muted">
-                      关闭后，领取人必须通过 Lyt IT Pay OAuth 授权登录后才可拆红包
-                    </div>
+                    <div className="text-xs font-medium text-zinc-900">允许手动填邮箱领取</div>
+                    <div className="text-[11px] text-zinc-400">关闭后需经 OAuth 授权领取</div>
                   </div>
                   <Switch isSelected={allowManual} onChange={setAllowManual}>
                     <Switch.Control>
@@ -1012,43 +878,35 @@ export default function AdminPage() {
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <div className="text-sm font-semibold flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    托管收款账号覆盖配置（可选，优先推荐通过环境变量设置）
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="s-m-email" className="text-xs text-zinc-500">
+                      托管账号邮箱
+                    </Label>
+                    <Input
+                      id="s-m-email"
+                      type="email"
+                      fullWidth
+                      value={merchantEmail}
+                      onChange={(e) => setMerchantEmail(e.target.value)}
+                    />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="s-m-email" className="text-xs font-medium text-muted">
-                        托管账户邮箱
-                      </Label>
-                      <Input
-                        id="s-m-email"
-                        type="email"
-                        fullWidth
-                        value={merchantEmail}
-                        onChange={(e) => setMerchantEmail(e.target.value)}
-                        placeholder="Lyt IT Pay 托管邮箱"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="s-m-pw" className="text-xs font-medium text-muted">
-                        托管账户密码（留空则保持不变）
-                      </Label>
-                      <Input
-                        id="s-m-pw"
-                        type="password"
-                        fullWidth
-                        value={merchantPassword}
-                        onChange={(e) => setMerchantPassword(e.target.value)}
-                        placeholder="留空不修改"
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="s-m-pw" className="text-xs text-zinc-500">
+                      托管账号密码（留空不改）
+                    </Label>
+                    <Input
+                      id="s-m-pw"
+                      type="password"
+                      fullWidth
+                      value={merchantPassword}
+                      onChange={(e) => setMerchantPassword(e.target.value)}
+                    />
                   </div>
                 </div>
 
                 <Button type="submit" variant="primary" isDisabled={savingSettings}>
-                  {savingSettings ? <Spinner size="sm" color="current" /> : "保存配置"}
+                  {savingSettings ? <Spinner size="sm" color="current" /> : "保存"}
                 </Button>
               </form>
             </Card.Content>
@@ -1056,7 +914,6 @@ export default function AdminPage() {
         </Tabs.Panel>
       </Tabs>
 
-      {/* Packet Detail Modal */}
       <Modal
         isOpen={Boolean(selectedPacket)}
         onOpenChange={(open) => {
@@ -1067,64 +924,42 @@ export default function AdminPage() {
           <Modal.Container size="lg">
             <Modal.Dialog>
               <Modal.Header>
-                <Modal.Heading>
-                  红包详情 · {selectedPacket?.red_packet_code}
-                </Modal.Heading>
+                <Modal.Heading>{selectedPacket?.red_packet_code}</Modal.Heading>
                 <Modal.CloseTrigger />
               </Modal.Header>
               <Modal.Body className="space-y-4">
                 {selectedPacket && (
                   <>
-                    <div className="grid grid-cols-2 gap-3 text-xs bg-black/[0.03] p-3 rounded-xl">
-                      <div>订单号：{selectedPacket.public_id}</div>
-                      <div>支付链接码：{selectedPacket.payment_link_code}</div>
-                      <div>付款人：{selectedPacket.payer_email || "未付款"}</div>
-                      <div>官方流水ID：{selectedPacket.payment_transaction_id || "-"}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-zinc-50 p-3 rounded-xl">
+                      <div>订单：{selectedPacket.public_id}</div>
+                      <div>支付码：{selectedPacket.payment_link_code}</div>
+                      <div>付款人：{selectedPacket.payer_email || "-"}</div>
+                      <div>流水 ID：{selectedPacket.payment_transaction_id || "-"}</div>
                       <div>实付：{centsToStr(selectedPacket.total_pay_cents)} Lyt</div>
                       <div>
-                        5%手续费：{centsToStr(selectedPacket.fee_amount_cents)} Lyt (
-                        {selectedPacket.fee_transfer_status})
+                        手续费：{centsToStr(selectedPacket.fee_amount_cents)} ({selectedPacket.fee_transfer_status})
                       </div>
                     </div>
-                    {selectedPacket.fee_transfer_error && (
-                      <Alert status="danger">
-                        <Alert.Indicator />
-                        <Alert.Content>
-                          <Alert.Description>
-                            手续费转账错误：{selectedPacket.fee_transfer_error}
-                          </Alert.Description>
-                        </Alert.Content>
-                      </Alert>
-                    )}
-                    <div>
-                      <div className="text-sm font-semibold mb-2">
-                        该红包下的全部领取记录 ({selectedPacketClaims.length})
-                      </div>
+                    <div className="divide-y divide-black/[0.05] border border-black/[0.05] rounded-xl">
                       {selectedPacketClaims.length === 0 ? (
-                        <div className="text-xs text-muted py-4 text-center">暂无领取记录</div>
+                        <div className="p-4 text-center text-xs text-zinc-400">暂无领取</div>
                       ) : (
-                        <div className="divide-y divide-black/5 border border-black/5 rounded-xl">
-                          {selectedPacketClaims.map((c) => (
-                            <div
-                              key={c.id}
-                              className="p-2.5 flex items-center justify-between text-xs"
-                            >
-                              <div>
-                                <div className="font-medium">{c.claimer_email}</div>
-                                <div className="text-muted">
-                                  {c.claim_method} ·{" "}
-                                  {new Date(c.claimed_at).toLocaleString("zh-CN")}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold text-rose-600">
-                                  {centsToStr(c.amount_cents)} Lyt
-                                </div>
-                                <div className="text-[11px] text-muted">{c.transfer_status}</div>
+                        selectedPacketClaims.map((c) => (
+                          <div
+                            key={c.id}
+                            className="p-3 flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="text-zinc-900">{c.claimer_email}</div>
+                              <div className="text-zinc-400">
+                                {c.claim_method} · {new Date(c.claimed_at).toLocaleString("zh-CN")}
                               </div>
                             </div>
-                          ))}
-                        </div>
+                            <div className="font-medium tabular-nums">
+                              {centsToStr(c.amount_cents)} Lyt
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </>

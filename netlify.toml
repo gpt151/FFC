@@ -1,0 +1,7 @@
+[build]
+  command = "npm run build"
+
+[build.environment]
+  # These non-secret configuration values match default literals in source/build output.
+  # Sensitive keys (ADMIN_PASSWORD, LYT_MERCHANT_PASSWORD, DATABASE_URL, SESSION_SECRET) remain scanned.
+  SECRETS_SCAN_OMIT_KEYS = "FEE_RATE,FEE_MODE,FEE_RECIPIENT_EMAIL,LYT_API_BASE_URL,LYT_MERCHANT_EMAIL,NEXT_PUBLIC_BASE_URL"
