@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserSession, hashPassphrase } from "@/lib/auth";
+import { encodeSignedToken, getRequestOrigin, getUserSession, hashPassphrase } from "@/lib/auth";
 import { createRedPacketRecord, getPlatformSettings } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 import { withMerchantSession } from "@/lib/merchant";
@@ -109,7 +109,45 @@ export async function POST(req: NextRequest) {
       expires_at: expiresAt,
     });
 
-    return NextResponse.json({
+    const origin = getRequestOrigin(req);
+    const snapshotToken = encodeSignedToken(
+      {
+        snap: {
+          public_id: record.public_id,
+          red_packet_code: record.red_packet_code,
+          packet_type: record.packet_type,
+          total_count: record.total_count,
+          remaining_count: record.remaining_count,
+          packet_amount_cents: record.packet_amount_cents,
+          remaining_amount_cents: record.remaining_amount_cents,
+          fee_amount_cents: record.fee_amount_cents,
+          total_pay_cents: record.total_pay_cents,
+          fee_rate: record.fee_rate,
+          fee_mode: record.fee_mode,
+          fee_recipient_email: record.fee_recipient_email,
+          fee_transfer_status: record.fee_transfer_status,
+          fee_transfer_error: record.fee_transfer_error,
+          fee_transferred_at: record.fee_transferred_at,
+          greeting: record.greeting,
+          sender_name: record.sender_name,
+          sender_email: record.sender_email,
+          passphrase_hash: record.passphrase_hash,
+          has_passphrase: record.has_passphrase,
+          payment_link_code: record.payment_link_code,
+          payment_link_id: record.payment_link_id,
+          payment_url: record.payment_url,
+          payer_email: record.payer_email,
+          payment_transaction_id: record.payment_transaction_id,
+          status: record.status,
+          created_at: record.created_at,
+          paid_at: record.paid_at,
+          expires_at: record.expires_at,
+        },
+      },
+      86400 * 7
+    );
+
+    const res = NextResponse.json({
       status: "success",
       data: {
         publicId: record.public_id,
@@ -123,6 +161,14 @@ export async function POST(req: NextRequest) {
         status: record.status,
       },
     });
+    res.cookies.set(`lyt_order_${record.public_id}`, snapshotToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: origin.startsWith("https://"),
+      path: "/",
+      maxAge: 86400 * 7,
+    });
+    return res;
   } catch (err) {
     return NextResponse.json(
       { status: "error", message: err instanceof Error ? err.message : "创建红包失败" },

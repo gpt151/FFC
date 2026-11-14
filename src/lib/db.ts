@@ -516,6 +516,57 @@ export async function getRedPacketByPublicId(publicId: string): Promise<RedPacke
   });
 }
 
+export async function rehydrateRedPacketRecord(
+  snapshot: Omit<RedPacketRecord, "id">
+): Promise<RedPacketRecord> {
+  const existing = await getRedPacketByPublicId(snapshot.public_id);
+  if (existing) return existing;
+
+  if (isPostgresConfigured()) {
+    return createRedPacketRecord({
+      public_id: snapshot.public_id,
+      red_packet_code: snapshot.red_packet_code,
+      packet_type: snapshot.packet_type,
+      total_count: snapshot.total_count,
+      remaining_count: snapshot.remaining_count,
+      packet_amount_cents: snapshot.packet_amount_cents,
+      remaining_amount_cents: snapshot.remaining_amount_cents,
+      fee_amount_cents: snapshot.fee_amount_cents,
+      total_pay_cents: snapshot.total_pay_cents,
+      fee_rate: snapshot.fee_rate,
+      fee_mode: snapshot.fee_mode,
+      fee_recipient_email: snapshot.fee_recipient_email,
+      fee_transfer_status: snapshot.fee_transfer_status,
+      fee_transfer_error: snapshot.fee_transfer_error,
+      greeting: snapshot.greeting,
+      sender_name: snapshot.sender_name,
+      sender_email: snapshot.sender_email,
+      passphrase_hash: snapshot.passphrase_hash,
+      has_passphrase: snapshot.has_passphrase,
+      payment_link_code: snapshot.payment_link_code,
+      payment_link_id: snapshot.payment_link_id,
+      payment_url: snapshot.payment_url,
+      payer_email: snapshot.payer_email,
+      payment_transaction_id: snapshot.payment_transaction_id,
+      status: snapshot.status,
+      expires_at: snapshot.expires_at,
+    });
+  }
+
+  return withLocalMutex(async () => {
+    const store = await readLocalStore();
+    const found = store.red_packets.find((p) => p.public_id === snapshot.public_id);
+    if (found) return found;
+    const record: RedPacketRecord = {
+      ...snapshot,
+      id: store.nextPacketId++,
+    };
+    store.red_packets.push(record);
+    await writeLocalStore(store);
+    return record;
+  });
+}
+
 export async function getRedPacketByCode(code: string): Promise<RedPacketRecord | null> {
   const normalized = code.trim().toUpperCase();
   if (isPostgresConfigured()) {

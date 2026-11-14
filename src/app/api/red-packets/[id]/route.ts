@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClaimsByPacketId, getRedPacketByPublicId } from "@/lib/db";
+import { decodeSignedToken } from "@/lib/auth";
+import {
+  getClaimsByPacketId,
+  getRedPacketByPublicId,
+  isEphemeralWarning,
+  rehydrateRedPacketRecord,
+  type RedPacketRecord,
+} from "@/lib/db";
 import { formatCents, maskEmail } from "@/lib/money";
 import { syncPaymentAndActivate } from "@/lib/redpacket-service";
+
+async function ensurePacketFromSnapshot(req: NextRequest, id: string): Promise<void> {
+  const existing = await getRedPacketByPublicId(id);
+  if (existing) return;
+  const rawCookie = req.cookies.get(`lyt_order_${id}`)?.value;
+  const decoded = decodeSignedToken<{ snap: Omit<RedPacketRecord, "id"> }>(rawCookie);
+  if (decoded?.snap && decoded.snap.public_id === id) {
+    await rehydrateRedPacketRecord(decoded.snap);
+  }
+}
 
 export async function GET(
   req: NextRequest,
@@ -10,6 +27,8 @@ export async function GET(
   try {
     const { id } = await context.params;
     const shouldSync = req.nextUrl.searchParams.get("sync") === "1";
+
+    await ensurePacketFromSnapshot(req, id);
 
     const packet = shouldSync
       ? await syncPaymentAndActivate(id)
@@ -24,7 +43,8 @@ export async function GET(
         ? await getClaimsByPacketId(packet.id)
         : [];
 
-    const isPaid = packet.status === "active" || packet.status === "completed" || packet.status === "expired";
+    const isPaid =
+      packet.status === "active" || packet.status === "completed" || packet.status === "expired";
 
     return NextResponse.json({
       status: "success",
@@ -49,7 +69,7 @@ export async function GET(
         createdAt: packet.created_at,
         paidAt: packet.paid_at,
         expiresAt: packet.expires_at,
-        // Reveal red packet code ONLY after payment succeeds!
+        ephemeralWarning: isEphemeralWarning(),
         redPacketCode: isPaid ? packet.red_packet_code : null,
         claims: claims
           .filter((c) => c.transfer_status === "completed")

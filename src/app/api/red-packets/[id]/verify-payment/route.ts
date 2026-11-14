@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncPaymentAndActivate } from "@/lib/redpacket-service";
+import { decodeSignedToken } from "@/lib/auth";
+import { getRedPacketByPublicId, rehydrateRedPacketRecord, type RedPacketRecord } from "@/lib/db";
 import { formatCents } from "@/lib/money";
+import { syncPaymentAndActivate } from "@/lib/redpacket-service";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params;
+    const existing = await getRedPacketByPublicId(id);
+    if (!existing) {
+      const rawCookie = req.cookies.get(`lyt_order_${id}`)?.value;
+      const decoded = decodeSignedToken<{ snap: Omit<RedPacketRecord, "id"> }>(rawCookie);
+      if (decoded?.snap && decoded.snap.public_id === id) {
+        await rehydrateRedPacketRecord(decoded.snap);
+      }
+    }
+
     const packet = await syncPaymentAndActivate(id);
     if (!packet) {
       return NextResponse.json({ status: "error", message: "红包订单不存在" }, { status: 404 });

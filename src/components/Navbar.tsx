@@ -51,7 +51,6 @@ export function Navbar() {
     { href: "/", label: "发红包" },
     { href: "/claim", label: "领红包" },
     { href: "/my", label: "记录" },
-    { href: "/admin", label: "后台" },
   ];
 
   return (
