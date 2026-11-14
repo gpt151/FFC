@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { encodeSignedToken, getRequestOrigin, getUserSession, hashPassphrase } from "@/lib/auth";
+import {
+  encodeSignedToken,
+  getRequestOrigin,
+  getResolvedSessionSecret,
+  getUserSession,
+  hashPassphrase,
+} from "@/lib/auth";
 import { createRedPacketRecord, getPlatformSettings } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 import { withMerchantSession } from "@/lib/merchant";
@@ -110,6 +116,7 @@ export async function POST(req: NextRequest) {
     });
 
     const origin = getRequestOrigin(req);
+    const sessionSecret = await getResolvedSessionSecret();
     const snapshotToken = encodeSignedToken(
       {
         snap: {
@@ -144,7 +151,8 @@ export async function POST(req: NextRequest) {
           expires_at: record.expires_at,
         },
       },
-      86400 * 7
+      86400 * 7,
+      sessionSecret
     );
 
     const res = NextResponse.json({

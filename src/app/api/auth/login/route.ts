@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { encodeSignedToken, getRequestOrigin } from "@/lib/auth";
+import { encodeSignedToken, getRequestOrigin, getResolvedSessionSecret } from "@/lib/auth";
 import { saveOAuthState } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 
@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
       // Cookie fallback below guarantees state survives even without DB persistence
     }
 
-    const pendingToken = encodeSignedToken({ authCode, secretKey, returnTo: safeReturnTo }, 600);
+    const secret = await getResolvedSessionSecret();
+    const pendingToken = encodeSignedToken({ authCode, secretKey, returnTo: safeReturnTo }, 600, secret);
     const res = NextResponse.redirect(authUrl);
     res.cookies.set("lyt_oauth_pending", pendingToken, {
       httpOnly: true,

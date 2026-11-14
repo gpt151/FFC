@@ -119,10 +119,19 @@ function centsToStr(cents: number): string {
 export default function AdminPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [usingDefaultDevPw, setUsingDefaultDevPw] = useState(false);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
+
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupMerchantEmail, setSetupMerchantEmail] = useState("1218545105@qq.com");
+  const [setupMerchantPassword, setSetupMerchantPassword] = useState("");
+  const [setupFeeRecipient, setSetupFeeRecipient] = useState("1218545105@qq.com");
+  const [setupFeePercent, setSetupFeePercent] = useState("5");
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [submittingSetup, setSubmittingSetup] = useState(false);
 
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [merchant, setMerchant] = useState<MerchantStatus | null>(null);
@@ -193,10 +202,43 @@ export default function AdminPage() {
           loadDashboard();
           loadMerchant();
         }
+        setNeedsSetup(Boolean(res?.data?.needsSetup));
         setUsingDefaultDevPw(Boolean(res?.data?.usingDefaultDevPassword));
       })
       .finally(() => setAuthLoading(false));
   }, [loadDashboard, loadMerchant]);
+
+  const handleSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSetupError(null);
+    setSubmittingSetup(true);
+    try {
+      const rateNum = Number(setupFeePercent) / 100;
+      const res = await fetch("/api/admin/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminPassword: setupPassword,
+          merchantEmail: setupMerchantEmail.trim(),
+          merchantPassword: setupMerchantPassword,
+          feeRecipientEmail: setupFeeRecipient.trim() || setupMerchantEmail.trim(),
+          feeRate: rateNum,
+          feeMode: "sender_pays",
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.status !== "success") {
+        throw new Error(json.message || "初始化失败");
+      }
+      setNeedsSetup(false);
+      setAuthenticated(true);
+      await Promise.all([loadDashboard(), loadMerchant()]);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "初始化失败");
+    } finally {
+      setSubmittingSetup(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,6 +356,116 @@ export default function AdminPage() {
     );
   }
 
+  if (!authenticated && needsSetup) {
+    return (
+      <div className="max-w-[440px] mx-auto py-12">
+        <Card className="border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] bg-white">
+          <Card.Content className="p-6 sm:p-7 space-y-5">
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-900">首次部署初始化</h1>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                配置管理员密码与 Lyt IT Pay 托管账号，信息将加密保存在数据库中
+              </p>
+            </div>
+
+            <form onSubmit={handleSetup} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="setup-admin-pw" className="text-xs font-medium text-zinc-500">
+                  设置后台登录密码（至少 6 位）
+                </Label>
+                <Input
+                  id="setup-admin-pw"
+                  type="password"
+                  required
+                  minLength={6}
+                  fullWidth
+                  value={setupPassword}
+                  onChange={(e) => setSetupPassword(e.target.value)}
+                  placeholder="用于登录 /admin 后台"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="setup-merchant-email" className="text-xs font-medium text-zinc-500">
+                  Lyt IT Pay 托管收款账号
+                </Label>
+                <Input
+                  id="setup-merchant-email"
+                  type="email"
+                  required
+                  fullWidth
+                  value={setupMerchantEmail}
+                  onChange={(e) => setSetupMerchantEmail(e.target.value)}
+                  placeholder="1218545105@qq.com"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="setup-merchant-pw" className="text-xs font-medium text-zinc-500">
+                  Lyt IT Pay 托管账号密码
+                </Label>
+                <Input
+                  id="setup-merchant-pw"
+                  type="password"
+                  required
+                  fullWidth
+                  value={setupMerchantPassword}
+                  onChange={(e) => setSetupMerchantPassword(e.target.value)}
+                  placeholder="用于创建收款链接与发放红包"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="setup-fee-recipient" className="text-xs font-medium text-zinc-500">
+                    抽成收款邮箱
+                  </Label>
+                  <Input
+                    id="setup-fee-recipient"
+                    type="email"
+                    required
+                    fullWidth
+                    value={setupFeeRecipient}
+                    onChange={(e) => setSetupFeeRecipient(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="setup-fee-pct" className="text-xs font-medium text-zinc-500">
+                    手续费率 (%)
+                  </Label>
+                  <Input
+                    id="setup-fee-pct"
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.1"
+                    required
+                    fullWidth
+                    value={setupFeePercent}
+                    onChange={(e) => setSetupFeePercent(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {setupError && (
+                <Alert status="danger">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{setupError}</Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              )}
+
+              <Button type="submit" variant="primary" fullWidth isDisabled={submittingSetup}>
+                {submittingSetup ? <Spinner size="sm" color="current" /> : "验证账号并完成初始化"}
+              </Button>
+            </form>
+          </Card.Content>
+        </Card>
+      </div>
+    );
+  }
+
   if (!authenticated) {
     return (
       <div className="max-w-[380px] mx-auto py-14">
@@ -347,7 +499,7 @@ export default function AdminPage() {
                   fullWidth
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="ADMIN_PASSWORD"
+                  placeholder="输入管理员密码"
                 />
               </div>
               {loginError && (

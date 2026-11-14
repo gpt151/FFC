@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { getUserSession } from "@/lib/auth";
+import { getAdminAuthConfig, getUserSession } from "@/lib/auth";
 import { getPlatformSettings, isEphemeralWarning, isPostgresConfigured } from "@/lib/db";
 
 export async function GET() {
   try {
-    const [settings, user] = await Promise.all([getPlatformSettings(), getUserSession()]);
+    const [settings, user, authConfig] = await Promise.all([
+      getPlatformSettings(),
+      getUserSession(),
+      getAdminAuthConfig(),
+    ]);
     return NextResponse.json({
       status: "success",
       data: {
@@ -15,6 +19,7 @@ export async function GET() {
         merchantConfigured: Boolean(settings.merchant_email && settings.merchant_password),
         postgresConfigured: isPostgresConfigured(),
         ephemeralWarning: isEphemeralWarning(),
+        adminSetupRequired: authConfig.mode === "unconfigured",
         user,
       },
     });

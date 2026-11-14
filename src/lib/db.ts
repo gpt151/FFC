@@ -76,6 +76,8 @@ export interface PlatformSettings {
   merchant_password: string;
   merchant_sess_id: string | null;
   merchant_sess_updated_at: string | null;
+  admin_password_hash: string | null;
+  session_secret: string | null;
 }
 
 interface LocalStoreData {
@@ -360,6 +362,8 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     merchant_password: map.merchant_password || process.env.LYT_MERCHANT_PASSWORD || "",
     merchant_sess_id: map.merchant_sess_id || null,
     merchant_sess_updated_at: map.merchant_sess_updated_at || null,
+    admin_password_hash: map.admin_password_hash || null,
+    session_secret: map.session_secret || null,
   };
 }
 

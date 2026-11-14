@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decodeSignedToken } from "@/lib/auth";
+import { decodeSignedToken, getResolvedSessionSecret } from "@/lib/auth";
 import {
   getClaimsByPacketId,
   getRedPacketByPublicId,
@@ -14,7 +14,8 @@ async function ensurePacketFromSnapshot(req: NextRequest, id: string): Promise<v
   const existing = await getRedPacketByPublicId(id);
   if (existing) return;
   const rawCookie = req.cookies.get(`lyt_order_${id}`)?.value;
-  const decoded = decodeSignedToken<{ snap: Omit<RedPacketRecord, "id"> }>(rawCookie);
+  const secret = await getResolvedSessionSecret();
+  const decoded = decodeSignedToken<{ snap: Omit<RedPacketRecord, "id"> }>(rawCookie, secret);
   if (decoded?.snap && decoded.snap.public_id === id) {
     await rehydrateRedPacketRecord(decoded.snap);
   }

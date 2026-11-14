@@ -3,6 +3,7 @@ import {
   decodeSignedToken,
   encodeSignedToken,
   getRequestOrigin,
+  getResolvedSessionSecret,
   USER_COOKIE_NAME,
 } from "@/lib/auth";
 import { getAndDeleteOAuthState } from "@/lib/db";
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
     const queryCode =
       req.nextUrl.searchParams.get("code") || req.nextUrl.searchParams.get("auth_code");
     const pendingCookie = req.cookies.get("lyt_oauth_pending")?.value;
+    const secret = await getResolvedSessionSecret();
     const pending = decodeSignedToken<{
       authCode: string;
       secretKey: string;
       returnTo: string;
-    }>(pendingCookie);
+    }>(pendingCookie, secret);
 
     const authCode = queryCode || pending?.authCode;
     if (!authCode) {
@@ -50,7 +52,8 @@ export async function GET(req: NextRequest) {
 
     const userToken = encodeSignedToken(
       { userId: info.data.user_id, email: info.data.email },
-      86400 * 7
+      86400 * 7,
+      secret
     );
 
     const targetUrl = new URL(returnTo, origin);
