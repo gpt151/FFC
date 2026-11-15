@@ -583,7 +583,7 @@ export default function AdminPage() {
             <Card.Content className="p-4 space-y-1">
               <div className="text-xs text-zinc-500">实付流水</div>
               <div className="text-2xl font-semibold tabular-nums text-zinc-900">
-                {dashboard.summary.totalVolume} <span className="text-xs font-normal text-zinc-400">Lyt</span>
+                {dashboard.summary.totalVolume} <span className="text-xs font-normal text-zinc-400">ELC</span>
               </div>
               <div className="text-[11px] text-zinc-400">
                 已付 {dashboard.summary.paidPacketsCount} · 待付 {dashboard.summary.awaitingPaymentCount}
@@ -595,10 +595,10 @@ export default function AdminPage() {
             <Card.Content className="p-4 space-y-1">
               <div className="text-xs text-zinc-500">手续费收益 (5%)</div>
               <div className="text-2xl font-semibold tabular-nums text-zinc-900">
-                {dashboard.summary.totalFee} <span className="text-xs font-normal text-zinc-400">Lyt</span>
+                {dashboard.summary.totalFee} <span className="text-xs font-normal text-zinc-400">ELC</span>
               </div>
               <div className="text-[11px] text-zinc-400">
-                已结 {dashboard.summary.settledFee} · 待结 {dashboard.summary.pendingOrFailedFee}
+                已结 {dashboard.summary.settledFee} ELC · 待结 {dashboard.summary.pendingOrFailedFee} ELC
               </div>
             </Card.Content>
           </Card>
@@ -607,10 +607,10 @@ export default function AdminPage() {
             <Card.Content className="p-4 space-y-1">
               <div className="text-xs text-zinc-500">已领取总额</div>
               <div className="text-2xl font-semibold tabular-nums text-zinc-900">
-                {dashboard.summary.totalClaimed} <span className="text-xs font-normal text-zinc-400">Lyt</span>
+                {dashboard.summary.totalClaimed} <span className="text-xs font-normal text-zinc-400">ELC</span>
               </div>
               <div className="text-[11px] text-zinc-400">
-                {dashboard.summary.totalClaimsCount} 次领取 · 剩余 {dashboard.summary.totalUnclaimed}
+                {dashboard.summary.totalClaimsCount} 次领取 · 剩余 {dashboard.summary.totalUnclaimed} ELC
               </div>
             </Card.Content>
           </Card>
@@ -621,7 +621,7 @@ export default function AdminPage() {
               <div className="text-2xl font-semibold tabular-nums text-zinc-900">
                 {merchant?.connected ? (
                   <>
-                    {merchant.balance} <span className="text-xs font-normal text-zinc-400">Lyt</span>
+                    {merchant.balance} <span className="text-xs font-normal text-zinc-400">ELC</span>
                   </>
                 ) : (
                   "--"
@@ -662,7 +662,7 @@ export default function AdminPage() {
                     <div
                       key={d.date}
                       className="flex-1 flex flex-col items-center gap-1.5 group"
-                      title={`${d.date}: 流水 ${d.volume} / 手续费 ${d.fee}`}
+                      title={`${d.date}: 流水 ${d.volume} ELC / 手续费 ${d.fee} ELC`}
                     >
                       <div className="w-full h-24 flex items-end justify-center gap-0.5">
                         <div
@@ -775,14 +775,14 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 tabular-nums">
                           <div className="font-medium text-zinc-900">
-                            {centsToStr(p.total_pay_cents)}
+                            {centsToStr(p.total_pay_cents)} ELC
                           </div>
                           <div className="text-[11px] text-zinc-400">
-                            池 {centsToStr(p.packet_amount_cents)}
+                            池 {centsToStr(p.packet_amount_cents)} ELC
                           </div>
                         </td>
                         <td className="px-4 py-3 tabular-nums">
-                          <div className="text-zinc-900">{centsToStr(p.fee_amount_cents)}</div>
+                          <div className="text-zinc-900">{centsToStr(p.fee_amount_cents)} ELC</div>
                           <div className="text-[11px] text-zinc-400">{p.fee_transfer_status}</div>
                         </td>
                         <td className="px-4 py-3 tabular-nums text-zinc-700">
@@ -880,7 +880,7 @@ export default function AdminPage() {
                         <td className="px-4 py-3">{c.claimer_email}</td>
                         <td className="px-4 py-3 text-zinc-500">{c.claim_method}</td>
                         <td className="px-4 py-3 font-medium tabular-nums">
-                          {centsToStr(c.amount_cents)} Lyt
+                          {centsToStr(c.amount_cents)} ELC
                         </td>
                         <td className="px-4 py-3">
                           <Chip
@@ -929,7 +929,7 @@ export default function AdminPage() {
                   <div className="p-4 rounded-xl bg-zinc-50 border border-black/[0.05] flex items-center justify-between">
                     <div className="text-sm font-medium text-zinc-900">{merchant.email}</div>
                     <div className="text-lg font-semibold tabular-nums text-zinc-900">
-                      {merchant.balance} Lyt
+                      {merchant.balance} ELC
                     </div>
                   </div>
                   {txItems.length > 0 && (
@@ -948,7 +948,7 @@ export default function AdminPage() {
                             </div>
                           </div>
                           <div className="font-mono font-medium tabular-nums">
-                            {String(tx.amount || "0.00")} Lyt
+                            {String(tx.amount || "0.00")} ELC
                           </div>
                         </div>
                       ))}
@@ -1087,9 +1087,9 @@ export default function AdminPage() {
                       <div>支付码：{selectedPacket.payment_link_code}</div>
                       <div>付款人：{selectedPacket.payer_email || "-"}</div>
                       <div>流水 ID：{selectedPacket.payment_transaction_id || "-"}</div>
-                      <div>实付：{centsToStr(selectedPacket.total_pay_cents)} Lyt</div>
+                      <div>实付：{centsToStr(selectedPacket.total_pay_cents)} ELC</div>
                       <div>
-                        手续费：{centsToStr(selectedPacket.fee_amount_cents)} ({selectedPacket.fee_transfer_status})
+                        手续费：{centsToStr(selectedPacket.fee_amount_cents)} ELC ({selectedPacket.fee_transfer_status})
                       </div>
                     </div>
                     <div className="divide-y divide-black/[0.05] border border-black/[0.05] rounded-xl">
@@ -1108,7 +1108,7 @@ export default function AdminPage() {
                               </div>
                             </div>
                             <div className="font-medium tabular-nums">
-                              {centsToStr(c.amount_cents)} Lyt
+                              {centsToStr(c.amount_cents)} ELC
                             </div>
                           </div>
                         ))

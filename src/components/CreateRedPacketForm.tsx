@@ -174,7 +174,7 @@ export function CreateRedPacketForm() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="rp-amount" className="text-xs font-medium text-zinc-500">
-                  {config.feeMode === "deduct_from_packet" ? "支付金额" : "红包金额"}
+                  {config.feeMode === "deduct_from_packet" ? "支付金额 (ELC)" : "红包金额 (ELC)"}
                 </Label>
                 <div className="flex items-center gap-1">
                   {PRESET_AMOUNTS.map((val) => (
@@ -323,11 +323,11 @@ export function CreateRedPacketForm() {
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between text-zinc-500">
                 <span>可领总额</span>
-                <span className="tabular-nums text-zinc-900">{feePreview.packetAmount} Lyt</span>
+                <span className="tabular-nums text-zinc-900">{feePreview.packetAmount} ELC</span>
               </div>
               <div className="flex items-center justify-between text-zinc-500">
                 <span>手续费 ({(config.feeRate * 100).toFixed(0)}%)</span>
-                <span className="tabular-nums text-zinc-900">{feePreview.feeAmount} Lyt</span>
+                <span className="tabular-nums text-zinc-900">{feePreview.feeAmount} ELC</span>
               </div>
               <div className="flex items-center justify-between pt-1.5 text-sm font-semibold text-zinc-900">
                 <span>应付总额</span>
@@ -338,7 +338,7 @@ export function CreateRedPacketForm() {
                   transition={{ duration: 0.16 }}
                   className="tabular-nums text-base"
                 >
-                  {feePreview.totalPay} Lyt
+                  {feePreview.totalPay} ELC
                 </motion.span>
               </div>
             </div>
@@ -375,7 +375,7 @@ export function CreateRedPacketForm() {
                     正在包红包...
                   </>
                 ) : (
-                  `塞钱进红包 · ${feePreview.totalPay} Lyt`
+                  `塞钱进红包 · ${feePreview.totalPay} ELC`
                 )}
               </Button>
             </motion.div>

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           status: "error",
-          message: `可分配红包净额（${formatCents(breakdown.packetAmountCents)}）不能少于每份最低 0.01（至少需 ${formatCents(totalCount)}）`,
+          message: `可分配红包净额（${formatCents(breakdown.packetAmountCents)} ELC）不能少于每份最低 0.01 ELC（至少需 ${formatCents(totalCount)} ELC）`,
         },
         { status: 400 }
       );

@@ -122,7 +122,7 @@ export default function MyRecordsPage() {
                       </Chip>
                     </div>
                     <div className="text-xs text-zinc-400 tabular-nums flex flex-wrap gap-3">
-                      <span>{p.packetAmount} Lyt</span>
+                      <span>{p.packetAmount} ELC</span>
                       <span>
                         {p.totalCount - p.remainingCount}/{p.totalCount}
                       </span>
@@ -157,7 +157,7 @@ export default function MyRecordsPage() {
                     </div>
                   </div>
                   <div className="text-sm font-semibold tabular-nums text-zinc-900">
-                    +{c.amount} Lyt
+                    +{c.amount} ELC
                   </div>
                 </div>
               ))}

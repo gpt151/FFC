@@ -249,7 +249,7 @@ export default function ClaimRedPacketPage() {
                     <div className="text-[11px] text-white/80">已转入 Lyt IT Pay</div>
                     <div className="text-3xl font-semibold tabular-nums text-amber-200">
                       +{alreadyClaimedAmount}{" "}
-                      <span className="text-sm font-normal">Lyt</span>
+                      <span className="text-sm font-normal">ELC</span>
                     </div>
                     {claimedResult?.emailMasked && (
                       <div className="text-[11px] text-white/75">
@@ -305,7 +305,7 @@ export default function ClaimRedPacketPage() {
             </div>
 
             <div className="text-[11px] text-white/75 tabular-nums">
-              总额 {data.packetAmount} Lyt · 剩余 {data.remainingCount}/{data.totalCount}
+              总额 {data.packetAmount} ELC · 剩余 {data.remainingCount}/{data.totalCount}
             </div>
           </Card.Content>
         </Card>
@@ -453,7 +453,7 @@ export default function ClaimRedPacketPage() {
                       {new Date(c.claimedAt).toLocaleString("zh-CN")}
                     </div>
                   </div>
-                  <div className="font-medium tabular-nums text-zinc-900">{c.amount} Lyt</div>
+                  <div className="font-medium tabular-nums text-zinc-900">{c.amount} ELC</div>
                 </motion.div>
               ))}
             </div>

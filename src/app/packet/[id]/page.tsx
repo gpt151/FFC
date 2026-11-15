@@ -221,10 +221,10 @@ export default function PacketOrderPage() {
                   <div className="text-xs text-zinc-500">应付金额</div>
                   <div className="text-4xl font-semibold tracking-tight tabular-nums text-zinc-900">
                     {packet.totalPayAmount}{" "}
-                    <span className="text-base font-normal text-zinc-500">Lyt</span>
+                    <span className="text-base font-normal text-zinc-500">ELC</span>
                   </div>
                   <div className="text-xs text-zinc-400 tabular-nums">
-                    红包 {packet.packetAmount} · 手续费 {packet.feeAmount}
+                    红包 {packet.packetAmount} ELC · 手续费 {packet.feeAmount} ELC
                   </div>
                 </div>
 
@@ -300,7 +300,7 @@ export default function PacketOrderPage() {
                     <div className="space-y-1">
                       <div className="text-xs text-white/75">
                         {packet.packetType === "lucky" ? "拼手气" : "等额"} ·{" "}
-                        {packet.packetAmount} Lyt · 剩余 {packet.remainingCount}/
+                        {packet.packetAmount} ELC · 剩余 {packet.remainingCount}/
                         {packet.totalCount}
                       </div>
                       <h2 className="text-xl font-semibold leading-snug">{packet.greeting}</h2>
@@ -398,7 +398,7 @@ export default function PacketOrderPage() {
                             </div>
                           </div>
                           <div className="font-medium tabular-nums text-zinc-900">
-                            {c.amount} Lyt
+                            {c.amount} ELC
                           </div>
                         </motion.div>
                       ))}
