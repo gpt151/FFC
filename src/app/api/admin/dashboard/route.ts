@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   try {
-    const [{ packets, claims }, settings] = await Promise.all([
+    const [{ packets, claims, operationLogs, accountLedger }, settings] = await Promise.all([
       getAllAdminData(),
       getPlatformSettings(),
     ]);
@@ -79,6 +79,84 @@ export async function GET() {
       packetCount: d.packetCount,
     }));
 
+    // Build per-account amount & IP summary
+    const accountMap = new Map<
+      string,
+      {
+        email: string;
+        paidCents: number;
+        paidCount: number;
+        claimedCents: number;
+        claimedCount: number;
+        feeIncomeCents: number;
+        lastIp: string | null;
+        lastActiveAt: string;
+      }
+    >();
+
+    const touchAccount = (email: string | null | undefined, ip?: string | null, at?: string | null) => {
+      const clean = (email || "").trim();
+      if (!clean) return null;
+      const key = clean.toLowerCase();
+      let entry = accountMap.get(key);
+      if (!entry) {
+        entry = {
+          email: clean,
+          paidCents: 0,
+          paidCount: 0,
+          claimedCents: 0,
+          claimedCount: 0,
+          feeIncomeCents: 0,
+          lastIp: ip || null,
+          lastActiveAt: at || "",
+        };
+        accountMap.set(key, entry);
+      }
+      if (at && (!entry.lastActiveAt || at > entry.lastActiveAt)) {
+        entry.lastActiveAt = at;
+        if (ip) entry.lastIp = ip;
+      } else if (!entry.lastIp && ip) {
+        entry.lastIp = ip;
+      }
+      return entry;
+    };
+
+    for (const p of paidPackets) {
+      const payerEmail = p.payer_email || p.sender_email;
+      const payer = touchAccount(payerEmail, p.creator_ip, p.paid_at || p.created_at);
+      if (payer) {
+        payer.paidCents += p.total_pay_cents;
+        payer.paidCount += 1;
+      }
+      if (p.fee_transfer_status === "completed" || p.fee_transfer_status === "self_retained") {
+        const feeOwner = touchAccount(p.fee_recipient_email, p.creator_ip, p.fee_transferred_at || p.paid_at || p.created_at);
+        if (feeOwner) {
+          feeOwner.feeIncomeCents += p.fee_amount_cents;
+        }
+      }
+    }
+
+    for (const c of completedClaims) {
+      const claimer = touchAccount(c.claimer_email, c.claimer_ip, c.claimed_at);
+      if (claimer) {
+        claimer.claimedCents += c.amount_cents;
+        claimer.claimedCount += 1;
+      }
+    }
+
+    for (const log of operationLogs) {
+      if (log.actor_email) {
+        touchAccount(log.actor_email, log.ip_address, log.created_at);
+      }
+    }
+
+    const accountSummaries = Array.from(accountMap.values())
+      .map((a) => ({
+        ...a,
+        netCents: a.claimedCents + a.feeIncomeCents - a.paidCents,
+      }))
+      .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+
     return NextResponse.json({
       status: "success",
       data: {
@@ -97,10 +175,15 @@ export async function GET() {
           pendingOrFailedFee: formatCents(failedFeeCents),
           totalClaimed: formatCents(totalClaimedCents),
           totalUnclaimed: formatCents(totalUnclaimedCents),
+          uniqueAccountsCount: accountSummaries.length,
+          operationLogsCount: operationLogs.length,
         },
         dailySeries,
         packets,
         claims,
+        accountSummaries,
+        accountLedger,
+        operationLogs,
         settings: {
           feeRate: settings.fee_rate,
           feeRecipientEmail: settings.fee_recipient_email,

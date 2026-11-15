@@ -4,11 +4,13 @@ import {
   ADMIN_COOKIE_NAME,
   encodeSignedToken,
   getAdminAuthConfig,
+  getClientIp,
   getRequestOrigin,
   getResolvedSessionSecret,
   isAdminAuthenticated,
   verifyAdminPassword,
 } from "@/lib/auth";
+import { recordOperationLog } from "@/lib/db";
 
 export async function GET() {
   const [authenticated, config] = await Promise.all([
@@ -53,9 +55,27 @@ export async function POST(req: NextRequest) {
         crypto.timingSafeEqual(inputBuf, expectedBuf);
     }
 
+    const clientIp = getClientIp(req);
     if (!valid) {
+      await recordOperationLog({
+        action: "admin_login",
+        actorType: "admin",
+        ipAddress: clientIp,
+        targetType: "auth",
+        status: "failed",
+        detail: "管理后台密码验证失败",
+      });
       return NextResponse.json({ status: "error", message: "后台密码错误" }, { status: 401 });
     }
+
+    await recordOperationLog({
+      action: "admin_login",
+      actorType: "admin",
+      ipAddress: clientIp,
+      targetType: "auth",
+      status: "success",
+      detail: "管理员成功登录后台",
+    });
 
     const secret = await getResolvedSessionSecret();
     const token = encodeSignedToken({ role: "admin" }, 86400 * 3, secret);

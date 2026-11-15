@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
-import { updatePlatformSettings } from "@/lib/db";
+import { getClientIp, isAdminAuthenticated } from "@/lib/auth";
+import { recordOperationLog, updatePlatformSettings } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
@@ -60,6 +60,16 @@ export async function POST(req: NextRequest) {
     }
 
     await updatePlatformSettings(updates);
+    const updatedKeys = Object.keys(updates).filter((k) => k !== "merchant_password" && k !== "merchant_sess_id");
+    await recordOperationLog({
+      action: "admin_update_settings",
+      actorType: "admin",
+      actorEmail: updates.merchant_email || null,
+      ipAddress: getClientIp(req),
+      targetType: "settings",
+      status: "success",
+      detail: `管理员修改系统配置 (${updatedKeys.join(", ") || "credentials"})`,
+    });
     return NextResponse.json({ status: "success", message: "系统配置已更新" });
   } catch (err) {
     return NextResponse.json(

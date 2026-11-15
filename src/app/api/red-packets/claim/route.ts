@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserSession, hashPassphrase } from "@/lib/auth";
+import { getClientIp, getUserSession, hashPassphrase } from "@/lib/auth";
 import {
   completeClaimTransfer,
   getClaimsByPacketId,
   getPlatformSettings,
+  recordAccountLedgerEntries,
+  recordOperationLog,
   reserveRedPacketShare,
   rollbackClaimReservation,
 } from "@/lib/db";
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const clientIp = getClientIp(req);
     const passphraseHash = body.passphrase?.trim() ? hashPassphrase(body.passphrase) : null;
 
     const { packet, claim } = await reserveRedPacketShare({
@@ -68,6 +71,7 @@ export async function POST(req: NextRequest) {
       claimerUserId,
       claimMethod,
       passphraseHash,
+      claimerIp: clientIp,
     });
 
     const amountStr = formatCents(claim.amount_cents);
@@ -83,6 +87,45 @@ export async function POST(req: NextRequest) {
       });
 
       await completeClaimTransfer(claim.id);
+      await recordAccountLedgerEntries([
+        {
+          accountEmail: claim.claimer_email,
+          role: "claimer",
+          direction: "in",
+          eventType: "packet_claim",
+          amountCents: claim.amount_cents,
+          relatedPublicId: packet.public_id,
+          relatedCode: packet.red_packet_code,
+          ipAddress: clientIp,
+          note: `拆红包入账 (${packet.red_packet_code})`,
+        },
+        ...(settings.merchant_email
+          ? [
+              {
+                accountEmail: settings.merchant_email,
+                role: "merchant" as const,
+                direction: "out" as const,
+                eventType: "merchant_out" as const,
+                amountCents: claim.amount_cents,
+                relatedPublicId: packet.public_id,
+                relatedCode: packet.red_packet_code,
+                ipAddress: clientIp,
+                note: `发放红包至 ${claim.claimer_email} (${packet.red_packet_code})`,
+              },
+            ]
+          : []),
+      ]);
+      await recordOperationLog({
+        action: "claim_packet",
+        actorType: "user",
+        actorEmail: claim.claimer_email,
+        ipAddress: clientIp,
+        targetType: "claim",
+        targetId: packet.red_packet_code,
+        amountCents: claim.amount_cents,
+        status: "success",
+        detail: `领取红包 ${packet.red_packet_code}，到账 ${amountStr} ELC (${claimMethod})`,
+      });
     } catch (transferErr) {
       const errorMsg =
         transferErr instanceof Error ? transferErr.message : "Lyt IT Pay 转账失败";
@@ -91,6 +134,17 @@ export async function POST(req: NextRequest) {
         claimId: claim.id,
         amountCents: claim.amount_cents,
         error: errorMsg,
+      });
+      await recordOperationLog({
+        action: "claim_packet",
+        actorType: "user",
+        actorEmail: claimerEmail,
+        ipAddress: clientIp,
+        targetType: "claim",
+        targetId: packet.red_packet_code,
+        amountCents: claim.amount_cents,
+        status: "failed",
+        detail: `领取 ${packet.red_packet_code} 打款失败并已回滚：${errorMsg}`,
       });
 
       return NextResponse.json(

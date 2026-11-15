@@ -41,6 +41,7 @@ export interface RedPacketRecord {
   payment_url: string;
   payer_email: string | null;
   payment_transaction_id: number | null;
+  creator_ip?: string | null;
   status: RedPacketStatus;
   created_at: string;
   paid_at: string | null;
@@ -57,7 +58,45 @@ export interface RedPacketClaimRecord {
   amount_cents: number;
   transfer_status: ClaimTransferStatus;
   transfer_error: string | null;
+  claimer_ip?: string | null;
   claimed_at: string;
+}
+
+export interface OperationLogRecord {
+  id: number;
+  action: string;
+  actor_type: "user" | "admin" | "system";
+  actor_email: string | null;
+  ip_address: string;
+  target_type: string | null;
+  target_id: string | null;
+  amount_cents: number | null;
+  status: "success" | "failed";
+  detail: string;
+  created_at: string;
+}
+
+export type AccountRole = "payer" | "claimer" | "fee_recipient" | "merchant";
+export type AccountEventType =
+  | "packet_pay"
+  | "packet_claim"
+  | "fee_income"
+  | "merchant_in"
+  | "merchant_out"
+  | "merchant_fee_out";
+
+export interface AccountLedgerRecord {
+  id: number;
+  account_email: string;
+  role: AccountRole;
+  direction: "in" | "out";
+  event_type: AccountEventType;
+  amount_cents: number;
+  related_public_id: string | null;
+  related_code: string | null;
+  ip_address: string | null;
+  note: string;
+  created_at: string;
 }
 
 export interface OAuthStateRecord {
@@ -83,10 +122,14 @@ export interface PlatformSettings {
 interface LocalStoreData {
   nextPacketId: number;
   nextClaimId: number;
+  nextLogId?: number;
+  nextLedgerId?: number;
   red_packets: RedPacketRecord[];
   red_packet_claims: RedPacketClaimRecord[];
   oauth_states: OAuthStateRecord[];
   platform_settings: Record<string, string>;
+  operation_logs?: OperationLogRecord[];
+  account_ledger?: AccountLedgerRecord[];
 }
 
 function isServerlessRuntime(): boolean {
@@ -218,6 +261,43 @@ async function ensurePgSchema(): Promise<void> {
           value TEXT NOT NULL,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+
+        ALTER TABLE red_packets ADD COLUMN IF NOT EXISTS creator_ip VARCHAR(64);
+        ALTER TABLE red_packet_claims ADD COLUMN IF NOT EXISTS claimer_ip VARCHAR(64);
+
+        CREATE TABLE IF NOT EXISTS operation_logs (
+          id SERIAL PRIMARY KEY,
+          action VARCHAR(64) NOT NULL,
+          actor_type VARCHAR(16) NOT NULL,
+          actor_email VARCHAR(255),
+          ip_address VARCHAR(64) NOT NULL,
+          target_type VARCHAR(32),
+          target_id VARCHAR(64),
+          amount_cents INTEGER,
+          status VARCHAR(16) NOT NULL DEFAULT 'success',
+          detail TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_oplogs_created_at ON operation_logs(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_oplogs_ip ON operation_logs(ip_address);
+
+        CREATE TABLE IF NOT EXISTS account_ledger (
+          id SERIAL PRIMARY KEY,
+          account_email VARCHAR(255) NOT NULL,
+          role VARCHAR(32) NOT NULL,
+          direction VARCHAR(8) NOT NULL,
+          event_type VARCHAR(32) NOT NULL,
+          amount_cents INTEGER NOT NULL,
+          related_public_id VARCHAR(64),
+          related_code VARCHAR(32),
+          ip_address VARCHAR(64),
+          note TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ledger_email ON account_ledger(LOWER(account_email));
+        CREATE INDEX IF NOT EXISTS idx_ledger_created_at ON account_ledger(created_at DESC);
       `);
     })();
   }
@@ -243,20 +323,32 @@ function createEmptyStore(): LocalStoreData {
   return {
     nextPacketId: 1,
     nextClaimId: 1,
+    nextLogId: 1,
+    nextLedgerId: 1,
     red_packets: [],
     red_packet_claims: [],
     oauth_states: [],
     platform_settings: {},
+    operation_logs: [],
+    account_ledger: [],
   };
 }
 
 async function readLocalStore(): Promise<LocalStoreData> {
   if (globalForDb.__memoryStore) {
+    globalForDb.__memoryStore.operation_logs ??= [];
+    globalForDb.__memoryStore.account_ledger ??= [];
+    globalForDb.__memoryStore.nextLogId ??= 1;
+    globalForDb.__memoryStore.nextLedgerId ??= 1;
     return globalForDb.__memoryStore;
   }
   try {
     const raw = await fs.readFile(getLocalStorePath(), "utf8");
     const parsed = JSON.parse(raw) as LocalStoreData;
+    parsed.operation_logs ??= [];
+    parsed.account_ledger ??= [];
+    parsed.nextLogId ??= 1;
+    parsed.nextLedgerId ??= 1;
     globalForDb.__memoryStore = parsed;
     return parsed;
   } catch {
@@ -308,6 +400,7 @@ function normalizePgPacket(row: Record<string, unknown>): RedPacketRecord {
       row.payment_transaction_id !== null && row.payment_transaction_id !== undefined
         ? Number(row.payment_transaction_id)
         : null,
+    creator_ip: row.creator_ip ? String(row.creator_ip) : null,
     status: row.status as RedPacketStatus,
     created_at: new Date(String(row.created_at)).toISOString(),
     paid_at: row.paid_at ? new Date(String(row.paid_at)).toISOString() : null,
@@ -329,6 +422,7 @@ function normalizePgClaim(row: Record<string, unknown>): RedPacketClaimRecord {
     amount_cents: Number(row.amount_cents),
     transfer_status: row.transfer_status as ClaimTransferStatus,
     transfer_error: row.transfer_error ? String(row.transfer_error) : null,
+    claimer_ip: row.claimer_ip ? String(row.claimer_ip) : null,
     claimed_at: new Date(String(row.claimed_at)).toISOString(),
   };
 }
@@ -454,9 +548,9 @@ export async function createRedPacketRecord(
         fee_rate, fee_mode, fee_recipient_email, fee_transfer_status, fee_transfer_error,
         greeting, sender_name, sender_email, passphrase_hash, has_passphrase,
         payment_link_code, payment_link_id, payment_url, payer_email, payment_transaction_id,
-        status, created_at, expires_at
+        creator_ip, status, created_at, expires_at
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
       ) RETURNING *`,
       [
         input.public_id,
@@ -483,6 +577,7 @@ export async function createRedPacketRecord(
         input.payment_url,
         input.payer_email,
         input.payment_transaction_id,
+        input.creator_ip ?? null,
         input.status,
         now,
         input.expires_at,
@@ -552,6 +647,7 @@ export async function rehydrateRedPacketRecord(
       payment_url: snapshot.payment_url,
       payer_email: snapshot.payer_email,
       payment_transaction_id: snapshot.payment_transaction_id,
+      creator_ip: snapshot.creator_ip ?? null,
       status: snapshot.status,
       expires_at: snapshot.expires_at,
     });
@@ -740,6 +836,7 @@ export async function reserveRedPacketShare(params: {
   claimerUserId: number | null;
   claimMethod: "oauth" | "manual";
   passphraseHash: string | null;
+  claimerIp?: string | null;
 }): Promise<{ packet: RedPacketRecord; claim: RedPacketClaimRecord }> {
   const normalizedCode = params.code.trim().toUpperCase();
   const normalizedEmail = params.claimerEmail.trim().toLowerCase();
@@ -825,8 +922,8 @@ export async function reserveRedPacketShare(params: {
       const { rows: insertedClaim } = await client.query(
         `INSERT INTO red_packet_claims (
           red_packet_id, red_packet_code, claimer_email, claimer_user_id,
-          claim_method, amount_cents, transfer_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, 'processing')
+          claim_method, amount_cents, transfer_status, claimer_ip
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'processing', $7)
         RETURNING *`,
         [
           packet.id,
@@ -835,6 +932,7 @@ export async function reserveRedPacketShare(params: {
           params.claimerUserId,
           params.claimMethod,
           amountCents,
+          params.claimerIp ?? null,
         ]
       );
 
@@ -875,6 +973,7 @@ export async function reserveRedPacketShare(params: {
       amount_cents: amountCents,
       transfer_status: "processing",
       transfer_error: null,
+      claimer_ip: params.claimerIp ?? null,
       claimed_at: new Date().toISOString(),
     };
     store.red_packet_claims.push(claim);
@@ -1017,21 +1116,194 @@ export async function getUserHistory(email: string): Promise<{
   });
 }
 
+function normalizePgLog(row: Record<string, unknown>): OperationLogRecord {
+  return {
+    id: Number(row.id),
+    action: String(row.action),
+    actor_type: (row.actor_type === "admin" || row.actor_type === "system"
+      ? row.actor_type
+      : "user") as OperationLogRecord["actor_type"],
+    actor_email: row.actor_email ? String(row.actor_email) : null,
+    ip_address: String(row.ip_address || "unknown"),
+    target_type: row.target_type ? String(row.target_type) : null,
+    target_id: row.target_id ? String(row.target_id) : null,
+    amount_cents:
+      row.amount_cents !== null && row.amount_cents !== undefined
+        ? Number(row.amount_cents)
+        : null,
+    status: row.status === "failed" ? "failed" : "success",
+    detail: String(row.detail || ""),
+    created_at: new Date(String(row.created_at)).toISOString(),
+  };
+}
+
+function normalizePgLedger(row: Record<string, unknown>): AccountLedgerRecord {
+  return {
+    id: Number(row.id),
+    account_email: String(row.account_email),
+    role: String(row.role) as AccountRole,
+    direction: row.direction === "out" ? "out" : "in",
+    event_type: String(row.event_type) as AccountEventType,
+    amount_cents: Number(row.amount_cents),
+    related_public_id: row.related_public_id ? String(row.related_public_id) : null,
+    related_code: row.related_code ? String(row.related_code) : null,
+    ip_address: row.ip_address ? String(row.ip_address) : null,
+    note: String(row.note || ""),
+    created_at: new Date(String(row.created_at)).toISOString(),
+  };
+}
+
+export async function recordOperationLog(input: {
+  action: string;
+  actorType: "user" | "admin" | "system";
+  actorEmail?: string | null;
+  ipAddress: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  amountCents?: number | null;
+  status?: "success" | "failed";
+  detail: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  try {
+    if (isPostgresConfigured()) {
+      await ensurePgSchema();
+      await getPool().query(
+        `INSERT INTO operation_logs (
+          action, actor_type, actor_email, ip_address, target_type, target_id, amount_cents, status, detail, created_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          input.action,
+          input.actorType,
+          input.actorEmail ?? null,
+          input.ipAddress || "unknown",
+          input.targetType ?? null,
+          input.targetId ?? null,
+          input.amountCents ?? null,
+          input.status ?? "success",
+          input.detail,
+          now,
+        ]
+      );
+      return;
+    }
+
+    await withLocalMutex(async () => {
+      const store = await readLocalStore();
+      const logs = store.operation_logs ?? [];
+      logs.push({
+        id: (store.nextLogId ?? 1),
+        action: input.action,
+        actor_type: input.actorType,
+        actor_email: input.actorEmail ?? null,
+        ip_address: input.ipAddress || "unknown",
+        target_type: input.targetType ?? null,
+        target_id: input.targetId ?? null,
+        amount_cents: input.amountCents ?? null,
+        status: input.status ?? "success",
+        detail: input.detail,
+        created_at: now,
+      });
+      store.nextLogId = (store.nextLogId ?? 1) + 1;
+      store.operation_logs = logs.slice(-500);
+      await writeLocalStore(store);
+    });
+  } catch {
+    // Audit log writes must never interrupt user payment/claim flows.
+  }
+}
+
+export async function recordAccountLedgerEntries(
+  entries: Array<{
+    accountEmail: string;
+    role: AccountRole;
+    direction: "in" | "out";
+    eventType: AccountEventType;
+    amountCents: number;
+    relatedPublicId?: string | null;
+    relatedCode?: string | null;
+    ipAddress?: string | null;
+    note: string;
+  }>
+): Promise<void> {
+  const valid = entries.filter((e) => e.accountEmail.trim() && e.amountCents > 0);
+  if (valid.length === 0) return;
+
+  const now = new Date().toISOString();
+  try {
+    if (isPostgresConfigured()) {
+      await ensurePgSchema();
+      const pool = getPool();
+      for (const e of valid) {
+        await pool.query(
+          `INSERT INTO account_ledger (
+            account_email, role, direction, event_type, amount_cents,
+            related_public_id, related_code, ip_address, note, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [
+            e.accountEmail.trim(),
+            e.role,
+            e.direction,
+            e.eventType,
+            e.amountCents,
+            e.relatedPublicId ?? null,
+            e.relatedCode ?? null,
+            e.ipAddress ?? null,
+            e.note,
+            now,
+          ]
+        );
+      }
+      return;
+    }
+
+    await withLocalMutex(async () => {
+      const store = await readLocalStore();
+      const ledger = store.account_ledger ?? [];
+      let nextId = store.nextLedgerId ?? 1;
+      for (const e of valid) {
+        ledger.push({
+          id: nextId++,
+          account_email: e.accountEmail.trim(),
+          role: e.role,
+          direction: e.direction,
+          event_type: e.eventType,
+          amount_cents: e.amountCents,
+          related_public_id: e.relatedPublicId ?? null,
+          related_code: e.relatedCode ?? null,
+          ip_address: e.ipAddress ?? null,
+          note: e.note,
+          created_at: now,
+        });
+      }
+      store.nextLedgerId = nextId;
+      store.account_ledger = ledger.slice(-1000);
+      await writeLocalStore(store);
+    });
+  } catch {
+    // Account ledger write failures should not crash payment/claim responses.
+  }
+}
+
 export async function getAllAdminData(): Promise<{
   packets: RedPacketRecord[];
   claims: RedPacketClaimRecord[];
+  operationLogs: OperationLogRecord[];
+  accountLedger: AccountLedgerRecord[];
 }> {
   if (isPostgresConfigured()) {
     await ensurePgSchema();
-    const { rows: pRows } = await getPool().query(
-      "SELECT * FROM red_packets ORDER BY created_at DESC"
-    );
-    const { rows: cRows } = await getPool().query(
-      "SELECT * FROM red_packet_claims ORDER BY claimed_at DESC"
-    );
+    const [pRes, cRes, lRes, gRes] = await Promise.all([
+      getPool().query("SELECT * FROM red_packets ORDER BY created_at DESC"),
+      getPool().query("SELECT * FROM red_packet_claims ORDER BY claimed_at DESC"),
+      getPool().query("SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT 300"),
+      getPool().query("SELECT * FROM account_ledger ORDER BY created_at DESC LIMIT 500"),
+    ]);
     return {
-      packets: pRows.map(normalizePgPacket),
-      claims: cRows.map(normalizePgClaim),
+      packets: pRes.rows.map(normalizePgPacket),
+      claims: cRes.rows.map(normalizePgClaim),
+      operationLogs: lRes.rows.map(normalizePgLog),
+      accountLedger: gRes.rows.map(normalizePgLedger),
     };
   }
 
@@ -1044,6 +1316,12 @@ export async function getAllAdminData(): Promise<{
       claims: [...store.red_packet_claims].sort((a, b) =>
         b.claimed_at.localeCompare(a.claimed_at)
       ),
+      operationLogs: [...(store.operation_logs ?? [])]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, 300),
+      accountLedger: [...(store.account_ledger ?? [])]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, 500),
     };
   });
 }

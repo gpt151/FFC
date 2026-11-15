@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
-import { getRedPacketByPublicId, updateRedPacketStatus } from "@/lib/db";
+import { getClientIp, isAdminAuthenticated } from "@/lib/auth";
+import { getRedPacketByPublicId, recordOperationLog, updateRedPacketStatus } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 import { withMerchantSession } from "@/lib/merchant";
 import { settlePacketFee, syncPaymentAndActivate } from "@/lib/redpacket-service";
@@ -17,13 +17,23 @@ export async function POST(
     const { id } = await context.params;
     const body = (await req.json()) as { action?: "sync" | "retry_fee" | "cancel" };
     const packet = await getRedPacketByPublicId(id);
+    const clientIp = getClientIp(req);
 
     if (!packet) {
       return NextResponse.json({ status: "error", message: "红包订单不存在" }, { status: 404 });
     }
 
     if (body.action === "sync") {
-      const updated = await syncPaymentAndActivate(id);
+      const updated = await syncPaymentAndActivate(id, clientIp);
+      await recordOperationLog({
+        action: "admin_packet_action",
+        actorType: "admin",
+        ipAddress: clientIp,
+        targetType: "packet",
+        targetId: id,
+        status: "success",
+        detail: `管理员手动核验订单 ${id} (状态: ${updated?.status || "unknown"})`,
+      });
       return NextResponse.json({ status: "success", data: updated });
     }
 
@@ -34,7 +44,17 @@ export async function POST(
           { status: 400 }
         );
       }
-      const res = await settlePacketFee(packet);
+      const res = await settlePacketFee(packet, clientIp);
+      await recordOperationLog({
+        action: "admin_packet_action",
+        actorType: "admin",
+        ipAddress: clientIp,
+        targetType: "packet",
+        targetId: id,
+        amountCents: packet.fee_amount_cents,
+        status: res.status === "failed" ? "failed" : "success",
+        detail: `管理员补发手续费 ${id} -> ${res.status}${res.error ? ` (${res.error})` : ""}`,
+      });
       return NextResponse.json({
         status: res.status === "failed" ? "error" : "success",
         message:
@@ -57,7 +77,7 @@ export async function POST(
         lytClient.getPaymentLinkStatus(sessId, packet.payment_link_code)
       );
       if (linkInfo.status === "completed") {
-        await syncPaymentAndActivate(id);
+        await syncPaymentAndActivate(id, clientIp);
         return NextResponse.json(
           { status: "error", message: "该订单已完成付款，已自动为您激活红包" },
           { status: 400 }
@@ -69,6 +89,15 @@ export async function POST(
         );
       }
       await updateRedPacketStatus(packet.id, "canceled");
+      await recordOperationLog({
+        action: "admin_packet_action",
+        actorType: "admin",
+        ipAddress: clientIp,
+        targetType: "packet",
+        targetId: id,
+        status: "success",
+        detail: `管理员撤销待付款订单 ${id}`,
+      });
       return NextResponse.json({ status: "success", message: "收款链接与订单已撤销" });
     }
 

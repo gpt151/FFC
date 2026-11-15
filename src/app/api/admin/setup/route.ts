@@ -5,10 +5,11 @@ import {
   clearCachedSessionSecret,
   encodeSignedToken,
   getAdminAuthConfig,
+  getClientIp,
   getRequestOrigin,
   hashAdminPassword,
 } from "@/lib/auth";
-import { isPostgresConfigured, updatePlatformSettings } from "@/lib/db";
+import { isPostgresConfigured, recordOperationLog, updatePlatformSettings } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 
 export async function POST(req: NextRequest) {
@@ -90,6 +91,16 @@ export async function POST(req: NextRequest) {
     });
 
     clearCachedSessionSecret();
+
+    await recordOperationLog({
+      action: "admin_setup",
+      actorType: "admin",
+      actorEmail: merchantEmail,
+      ipAddress: getClientIp(req),
+      targetType: "settings",
+      status: "success",
+      detail: `完成首次系统初始化，托管账号 ${merchantEmail}，手续费率 ${(feeRateNum * 100).toFixed(1)}%`,
+    });
 
     const token = encodeSignedToken({ role: "admin" }, 86400 * 3, sessionSecret);
     const origin = getRequestOrigin(req);

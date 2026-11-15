@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   decodeSignedToken,
   encodeSignedToken,
+  getClientIp,
   getRequestOrigin,
   getResolvedSessionSecret,
   USER_COOKIE_NAME,
 } from "@/lib/auth";
-import { getAndDeleteOAuthState } from "@/lib/db";
+import { getAndDeleteOAuthState, recordOperationLog } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 
 export async function GET(req: NextRequest) {
@@ -55,6 +56,17 @@ export async function GET(req: NextRequest) {
       86400 * 7,
       secret
     );
+
+    await recordOperationLog({
+      action: "oauth_login",
+      actorType: "user",
+      actorEmail: info.data.email,
+      ipAddress: getClientIp(req),
+      targetType: "auth",
+      targetId: String(info.data.user_id),
+      status: "success",
+      detail: `Lyt IT Pay OAuth 授权登录 (${info.data.email})`,
+    });
 
     const targetUrl = new URL(returnTo, origin);
     targetUrl.searchParams.set("auth_success", "1");

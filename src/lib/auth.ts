@@ -21,6 +21,25 @@ export function getRequestOrigin(req: NextRequest): string {
   return req.nextUrl.origin;
 }
 
+/**
+ * Extracts client IP behind Vercel / reverse-proxy headers.
+ */
+export function getClientIp(req: NextRequest): string {
+  const candidates = [
+    req.headers.get("x-vercel-forwarded-for"),
+    req.headers.get("x-forwarded-for"),
+    req.headers.get("cf-connecting-ip"),
+    req.headers.get("x-real-ip"),
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const first = raw.split(",")[0].trim();
+    if (!first) continue;
+    return first.startsWith("::ffff:") ? first.slice(7) : first;
+  }
+  return "unknown";
+}
+
 function getSessionSecret(): string {
   return (
     process.env.SESSION_SECRET ||

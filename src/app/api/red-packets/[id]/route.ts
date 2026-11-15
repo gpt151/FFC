@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decodeSignedToken, getResolvedSessionSecret } from "@/lib/auth";
+import { decodeSignedToken, getClientIp, getResolvedSessionSecret } from "@/lib/auth";
 import {
   getClaimsByPacketId,
   getRedPacketByPublicId,
@@ -32,7 +32,7 @@ export async function GET(
     await ensurePacketFromSnapshot(req, id);
 
     const packet = shouldSync
-      ? await syncPaymentAndActivate(id)
+      ? await syncPaymentAndActivate(id, getClientIp(req))
       : await getRedPacketByPublicId(id);
 
     if (!packet) {

@@ -43,6 +43,7 @@ interface AdminPacket {
   payer_email: string | null;
   payment_link_code: string;
   payment_transaction_id: number | null;
+  creator_ip?: string | null;
   status: string;
   created_at: string;
   paid_at: string | null;
@@ -57,7 +58,48 @@ interface AdminClaim {
   amount_cents: number;
   transfer_status: "processing" | "completed" | "failed";
   transfer_error: string | null;
+  claimer_ip?: string | null;
   claimed_at: string;
+}
+
+interface AdminAccountSummary {
+  email: string;
+  paidCents: number;
+  paidCount: number;
+  claimedCents: number;
+  claimedCount: number;
+  feeIncomeCents: number;
+  netCents: number;
+  lastIp: string | null;
+  lastActiveAt: string;
+}
+
+interface AdminAccountLedgerItem {
+  id: number;
+  account_email: string;
+  role: string;
+  direction: "in" | "out";
+  event_type: string;
+  amount_cents: number;
+  related_public_id: string | null;
+  related_code: string | null;
+  ip_address: string | null;
+  note: string;
+  created_at: string;
+}
+
+interface AdminOperationLogItem {
+  id: number;
+  action: string;
+  actor_type: string;
+  actor_email: string | null;
+  ip_address: string;
+  target_type: string | null;
+  target_id: string | null;
+  amount_cents: number | null;
+  status: "success" | "failed";
+  detail: string;
+  created_at: string;
 }
 
 interface DashboardPayload {
@@ -76,6 +118,8 @@ interface DashboardPayload {
     pendingOrFailedFee: string;
     totalClaimed: string;
     totalUnclaimed: string;
+    uniqueAccountsCount?: number;
+    operationLogsCount?: number;
   };
   dailySeries: Array<{
     date: string;
@@ -86,6 +130,9 @@ interface DashboardPayload {
   }>;
   packets: AdminPacket[];
   claims: AdminClaim[];
+  accountSummaries?: AdminAccountSummary[];
+  accountLedger?: AdminAccountLedgerItem[];
+  operationLogs?: AdminOperationLogItem[];
   settings: {
     feeRate: number;
     feeRecipientEmail: string;
@@ -142,6 +189,8 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState("packets");
   const [search, setSearch] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
+  const [logSearch, setLogSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPacket, setSelectedPacket] = useState<AdminPacket | null>(null);
 
@@ -333,10 +382,50 @@ export default function AdminPage() {
         p.public_id.toLowerCase().includes(q) ||
         (p.payer_email || "").toLowerCase().includes(q) ||
         (p.sender_email || "").toLowerCase().includes(q) ||
+        (p.creator_ip || "").toLowerCase().includes(q) ||
         p.greeting.toLowerCase().includes(q)
       );
     });
   }, [dashboard, search, statusFilter]);
+
+  const filteredAccounts = useMemo(() => {
+    const list = dashboard?.accountSummaries || [];
+    const q = accountSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (a) =>
+        a.email.toLowerCase().includes(q) ||
+        (a.lastIp || "").toLowerCase().includes(q)
+    );
+  }, [dashboard, accountSearch]);
+
+  const filteredLedger = useMemo(() => {
+    const list = dashboard?.accountLedger || [];
+    const q = accountSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (l) =>
+        l.account_email.toLowerCase().includes(q) ||
+        (l.ip_address || "").toLowerCase().includes(q) ||
+        (l.related_code || "").toLowerCase().includes(q) ||
+        (l.related_public_id || "").toLowerCase().includes(q) ||
+        l.note.toLowerCase().includes(q)
+    );
+  }, [dashboard, accountSearch]);
+
+  const filteredLogs = useMemo(() => {
+    const list = dashboard?.operationLogs || [];
+    const q = logSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (log) =>
+        log.action.toLowerCase().includes(q) ||
+        log.ip_address.toLowerCase().includes(q) ||
+        (log.actor_email || "").toLowerCase().includes(q) ||
+        (log.target_id || "").toLowerCase().includes(q) ||
+        log.detail.toLowerCase().includes(q)
+    );
+  }, [dashboard, logSearch]);
 
   const selectedPacketClaims = useMemo(() => {
     if (!dashboard || !selectedPacket) return [];
@@ -697,6 +786,14 @@ export default function AdminPage() {
               领取流水 ({dashboard?.claims.length || 0})
               <Tabs.Indicator />
             </Tabs.Tab>
+            <Tabs.Tab id="accounts">
+              账号金额 ({dashboard?.accountSummaries?.length || 0})
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="logs">
+              操作日志 ({dashboard?.operationLogs?.length || 0})
+              <Tabs.Indicator />
+            </Tabs.Tab>
             <Tabs.Tab id="merchant">
               官方对账
               <Tabs.Indicator />
@@ -771,7 +868,10 @@ export default function AdminPage() {
                           <div className="text-[11px] text-zinc-400 font-mono">{p.public_id}</div>
                         </td>
                         <td className="px-4 py-3 text-zinc-700">
-                          {p.payer_email || p.sender_email || "-"}
+                          <div>{p.payer_email || p.sender_email || "-"}</div>
+                          <div className="text-[11px] text-zinc-400 font-mono">
+                            IP: {p.creator_ip || "-"}
+                          </div>
                         </td>
                         <td className="px-4 py-3 tabular-nums">
                           <div className="font-medium text-zinc-900">
@@ -860,6 +960,7 @@ export default function AdminPage() {
                     <th className="px-4 py-3 font-medium">激活码</th>
                     <th className="px-4 py-3 font-medium">领取人</th>
                     <th className="px-4 py-3 font-medium">方式</th>
+                    <th className="px-4 py-3 font-medium">操作 IP</th>
                     <th className="px-4 py-3 font-medium">金额</th>
                     <th className="px-4 py-3 font-medium">状态</th>
                     <th className="px-4 py-3 font-medium">时间</th>
@@ -868,7 +969,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-black/[0.05]">
                   {!dashboard || dashboard.claims.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-zinc-400">
+                      <td colSpan={8} className="px-4 py-10 text-center text-zinc-400">
                         暂无数据
                       </td>
                     </tr>
@@ -879,6 +980,9 @@ export default function AdminPage() {
                         <td className="px-4 py-3 font-mono font-medium">{c.red_packet_code}</td>
                         <td className="px-4 py-3">{c.claimer_email}</td>
                         <td className="px-4 py-3 text-zinc-500">{c.claim_method}</td>
+                        <td className="px-4 py-3 font-mono text-zinc-500">
+                          {c.claimer_ip || "-"}
+                        </td>
                         <td className="px-4 py-3 font-medium tabular-nums">
                           {centsToStr(c.amount_cents)} ELC
                         </td>
@@ -893,6 +997,222 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-zinc-400">
                           {new Date(c.claimed_at).toLocaleString("zh-CN")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </Tabs.Panel>
+
+        <Tabs.Panel id="accounts" className="pt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="relative flex-1 max-w-xs min-w-[220px]">
+              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                value={accountSearch}
+                onChange={(e) => setAccountSearch(e.target.value)}
+                placeholder="搜索账号邮箱、IP、红包码..."
+                className="pl-8 w-full"
+              />
+            </div>
+            <a href="/api/admin/export?type=accounts">
+              <Button size="sm" variant="secondary">
+                <Download className="w-3.5 h-3.5" />
+                导出账号流水 CSV
+              </Button>
+            </a>
+          </div>
+
+          <Card className="border border-black/[0.06] bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-black/[0.05] text-xs font-medium text-zinc-900">
+              账号金额汇总
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-zinc-50 border-b border-black/[0.05] text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">账号邮箱</th>
+                    <th className="px-4 py-3 font-medium">发包实付</th>
+                    <th className="px-4 py-3 font-medium">领包入账</th>
+                    <th className="px-4 py-3 font-medium">抽成收益</th>
+                    <th className="px-4 py-3 font-medium">净变动</th>
+                    <th className="px-4 py-3 font-medium">最近 IP</th>
+                    <th className="px-4 py-3 font-medium">最近活跃</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.05]">
+                  {filteredAccounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
+                        暂无账号记录
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAccounts.map((acc) => (
+                      <tr key={acc.email} className="hover:bg-zinc-50/60">
+                        <td className="px-4 py-3 font-medium text-zinc-900">{acc.email}</td>
+                        <td className="px-4 py-3 tabular-nums text-zinc-700">
+                          {centsToStr(acc.paidCents)} ELC
+                          <span className="text-[11px] text-zinc-400 ml-1">({acc.paidCount})</span>
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-emerald-700">
+                          +{centsToStr(acc.claimedCents)} ELC
+                          <span className="text-[11px] text-zinc-400 ml-1">({acc.claimedCount})</span>
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-zinc-700">
+                          {centsToStr(acc.feeIncomeCents)} ELC
+                        </td>
+                        <td className="px-4 py-3 tabular-nums font-medium">
+                          {acc.netCents >= 0 ? "+" : ""}
+                          {centsToStr(acc.netCents)} ELC
+                        </td>
+                        <td className="px-4 py-3 font-mono text-zinc-500">
+                          {acc.lastIp || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-400">
+                          {acc.lastActiveAt
+                            ? new Date(acc.lastActiveAt).toLocaleString("zh-CN")
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card className="border border-black/[0.06] bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-black/[0.05] text-xs font-medium text-zinc-900">
+              账号金额变动记录
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-zinc-50 border-b border-black/[0.05] text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">账号邮箱</th>
+                    <th className="px-4 py-3 font-medium">角色 / 类型</th>
+                    <th className="px-4 py-3 font-medium">金额变动</th>
+                    <th className="px-4 py-3 font-medium">关联单号</th>
+                    <th className="px-4 py-3 font-medium">操作 IP</th>
+                    <th className="px-4 py-3 font-medium">说明</th>
+                    <th className="px-4 py-3 font-medium">时间</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.05]">
+                  {filteredLedger.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
+                        暂无变动流水
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLedger.map((item) => (
+                      <tr key={item.id} className="hover:bg-zinc-50/60">
+                        <td className="px-4 py-3 font-medium text-zinc-900">
+                          {item.account_email}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500">
+                          {item.role} · {item.event_type}
+                        </td>
+                        <td
+                          className={`px-4 py-3 tabular-nums font-medium ${
+                            item.direction === "in" ? "text-emerald-700" : "text-zinc-900"
+                          }`}
+                        >
+                          {item.direction === "in" ? "+" : "-"}
+                          {centsToStr(item.amount_cents)} ELC
+                        </td>
+                        <td className="px-4 py-3 font-mono text-zinc-600">
+                          {item.related_code || item.related_public_id || "-"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-zinc-500">
+                          {item.ip_address || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">{item.note}</td>
+                        <td className="px-4 py-3 text-zinc-400">
+                          {new Date(item.created_at).toLocaleString("zh-CN")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </Tabs.Panel>
+
+        <Tabs.Panel id="logs" className="pt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="relative flex-1 max-w-xs min-w-[220px]">
+              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                placeholder="搜索操作 IP、邮箱、单号、动作..."
+                className="pl-8 w-full"
+              />
+            </div>
+            <a href="/api/admin/export?type=logs">
+              <Button size="sm" variant="secondary">
+                <Download className="w-3.5 h-3.5" />
+                导出操作日志 CSV
+              </Button>
+            </a>
+          </div>
+
+          <Card className="border border-black/[0.06] bg-white overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-zinc-50 border-b border-black/[0.05] text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">操作类型</th>
+                    <th className="px-4 py-3 font-medium">操作账号</th>
+                    <th className="px-4 py-3 font-medium">操作 IP</th>
+                    <th className="px-4 py-3 font-medium">金额</th>
+                    <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">详情</th>
+                    <th className="px-4 py-3 font-medium">时间</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.05]">
+                  {filteredLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
+                        暂无操作日志
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-zinc-50/60">
+                        <td className="px-4 py-3 font-mono text-zinc-900">
+                          <div>{log.action}</div>
+                          <div className="text-[11px] text-zinc-400">{log.actor_type}</div>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-700">
+                          {log.actor_email || "-"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-zinc-700">
+                          {log.ip_address}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-zinc-700">
+                          {log.amount_cents !== null ? `${centsToStr(log.amount_cents)} ELC` : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={log.status === "success" ? "success" : "danger"}
+                          >
+                            <Chip.Label className="text-[11px]">{log.status}</Chip.Label>
+                          </Chip>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600 max-w-md">{log.detail}</td>
+                        <td className="px-4 py-3 text-zinc-400">
+                          {new Date(log.created_at).toLocaleString("zh-CN")}
                         </td>
                       </tr>
                     ))
@@ -1086,6 +1406,7 @@ export default function AdminPage() {
                       <div>订单：{selectedPacket.public_id}</div>
                       <div>支付码：{selectedPacket.payment_link_code}</div>
                       <div>付款人：{selectedPacket.payer_email || "-"}</div>
+                      <div>创建 IP：{selectedPacket.creator_ip || "-"}</div>
                       <div>流水 ID：{selectedPacket.payment_transaction_id || "-"}</div>
                       <div>实付：{centsToStr(selectedPacket.total_pay_cents)} ELC</div>
                       <div>
@@ -1104,7 +1425,8 @@ export default function AdminPage() {
                             <div>
                               <div className="text-zinc-900">{c.claimer_email}</div>
                               <div className="text-zinc-400">
-                                {c.claim_method} · {new Date(c.claimed_at).toLocaleString("zh-CN")}
+                                {c.claim_method} · IP: {c.claimer_ip || "-"} ·{" "}
+                                {new Date(c.claimed_at).toLocaleString("zh-CN")}
                               </div>
                             </div>
                             <div className="font-medium tabular-nums">

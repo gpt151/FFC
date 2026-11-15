@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decodeSignedToken, getResolvedSessionSecret } from "@/lib/auth";
+import { decodeSignedToken, getClientIp, getResolvedSessionSecret } from "@/lib/auth";
 import { getRedPacketByPublicId, rehydrateRedPacketRecord, type RedPacketRecord } from "@/lib/db";
 import { formatCents } from "@/lib/money";
 import { syncPaymentAndActivate } from "@/lib/redpacket-service";
@@ -20,7 +20,7 @@ export async function POST(
       }
     }
 
-    const packet = await syncPaymentAndActivate(id);
+    const packet = await syncPaymentAndActivate(id, getClientIp(req));
     if (!packet) {
       return NextResponse.json({ status: "error", message: "红包订单不存在" }, { status: 404 });
     }

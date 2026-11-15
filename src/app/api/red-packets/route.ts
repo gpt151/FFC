@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   encodeSignedToken,
+  getClientIp,
   getRequestOrigin,
   getResolvedSessionSecret,
   getUserSession,
   hashPassphrase,
 } from "@/lib/auth";
-import { createRedPacketRecord, getPlatformSettings } from "@/lib/db";
+import { createRedPacketRecord, getPlatformSettings, recordOperationLog } from "@/lib/db";
 import { lytClient } from "@/lib/lytpay";
 import { withMerchantSession } from "@/lib/merchant";
 import {
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await getUserSession();
+    const clientIp = getClientIp(req);
     const publicId = generateOrderId();
     const redPacketCode = generateRedPacketCode();
     const greeting = (body.greeting || "恭喜发财，大吉大利").trim().slice(0, 120) || "恭喜发财，大吉大利";
@@ -111,8 +113,21 @@ export async function POST(req: NextRequest) {
       payment_url: payUrl,
       payer_email: null,
       payment_transaction_id: null,
+      creator_ip: clientIp,
       status: "awaiting_payment",
       expires_at: expiresAt,
+    });
+
+    await recordOperationLog({
+      action: "create_packet",
+      actorType: "user",
+      actorEmail: user?.email || null,
+      ipAddress: clientIp,
+      targetType: "packet",
+      targetId: record.public_id,
+      amountCents: record.total_pay_cents,
+      status: "success",
+      detail: `创建${packetType === "lucky" ? "拼手气" : "等额"}红包 ${record.red_packet_code} (${totalCount}份，应付 ${payAmountStr} ELC)`,
     });
 
     const origin = getRequestOrigin(req);
@@ -145,6 +160,7 @@ export async function POST(req: NextRequest) {
           payment_url: record.payment_url,
           payer_email: record.payer_email,
           payment_transaction_id: record.payment_transaction_id,
+          creator_ip: record.creator_ip ?? null,
           status: record.status,
           created_at: record.created_at,
           paid_at: record.paid_at,
